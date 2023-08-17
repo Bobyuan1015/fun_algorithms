@@ -1,61 +1,91 @@
 import numpy as np
-
-
 from ReinforcementLearning.env.cliff_env import CliffEnv
+'''Dynamic programming algorithm requires complete knowledge of the environment, i.e., it's a model-based algorithm.'''
 
+def get_q_value(row, col, action):
+    """
+    This function calculates the score of taking an action in a given state, the Q(s,a).
 
-#计算在一个状态下执行动作的分数，Q函数
-def get_qsa(row, col, action):
-    #在当前状态下执行动作,得到下一个状态和reward
+    Parameters:
+    row,col (int): state
+    action (int): action
+
+    Returns:
+    int: The value of Q(s,q)
+    """
+
+    # Performing an action in the current state yields the next state and reward.
     next_row, next_col, reward = env.move(row, col, action)
-    #计算下一个状态的分数,取values当中记录的分数即可,0.9是折扣因子，因为未来的值是不确定的
+    '''Calculating the score of the next state,
+    take the score recorded in the values, with 0.9 as the discount factor, as future values are uncertain.'''
     value = env.values[next_row, next_col] * 0.9
-    #如果下个状态是终点或者陷阱,则下一个状态的分数是0
+    # If the next state is a terminal state or a trap, then the score of the next state is 0.
     if env.get_state(next_row, next_col) in ['trap', 'terminal']:
         value = 0
-    #动作的分数本身就是reward,加上下一个状态的分数
+    # The score of an action is the reward, and plus the score of the next state
     return value + reward
 
-#策略评估，V函数
-def update_values(algorithm='policy_based'):
-    #初始化一个新的values,重新评估所有格子的分数，全0
+def update_v_value(algorithm='policy_based'):
+    """
+    This function calculates Policy evaluation, V(s).
+
+    Parameters:
+    algorithm: algorithm type
+
+    Returns:
+    The values of V(s)
+    """
+    # Initialize a new set of values, reevaluate the scores of all cells, set them all to 0
     new_values = np.zeros([4, 12])
-    #遍历所有格子
+    # iterate through all cells
     for row in range(4):
         for col in range(12):
-            #计算当前格子4个动作分别的分数
+
+            # Calculate the scores for each of the 4 actions in the current cell
             action_value = np.zeros(4)
-            #遍历所有动作，完全采用exploration
+            # iterate through all actions, applying full exploration
             for action in range(4):
-                action_value[action] = get_qsa(row, col, action)
+                action_value[action] = get_q_value(row, col, action)
+
             if algorithm == 'policy_based':
-                #每个动作的分数和它的概率相乘（转移；概率）
-                action_value *= env.pi[row, col]
-                #最后这个格子的分数,等于该格子下所有动作的分数求和
+                '''Policy iteration'''
+
+                # multiply the score of each action by its probability (transition probability)
+                action_value *= pi[row, col]
+
+                # finally, the score of this cell is the sum of scores of all actions in that cell.
                 new_values[row, col] = action_value.sum()
             elif algorithm == 'value_based':
-                # 价值迭代
-                """和策略迭代算法唯一的不同点"""  # 不需要做做动作转移
-                # 求每一个格子的分数，等于该格子下所有动作的最大分数
+                '''Value iteration
+                the only difference from the policy iteration:  action transitions are not required
+                '''
+
+                # for each cell, compute its score as the maximum score among all actions in that cell.
                 new_values[row, col] = action_value.max()
 
     return new_values
 
-
 def update_pi():
-    #重新初始化每个格子下采用动作的概率,重新评估
+    """
+    This function updates the policy function., Pi function.
+    Recompute the probabilities for each action based on the Q values of each cell.
+
+    Returns:
+    The improved Pi function
+    """
+    # Reinitialize the probabilities of taking actions in each cell
     new_pi = np.zeros([4, 12, 4])
-    #遍历所有格子
+    # iterate through all cells, calculate the scores for each of the 4 actions in the current cell
     for row in range(4):
         for col in range(12):
-            #计算当前格子4个动作分别的分数
             action_value = np.zeros(4)
-            #遍历所有动作
+            # iterate through all actions
             for action in range(4):
-                action_value[action] = get_qsa(row, col, action)
-            #计算当前状态下，达到最大分数的动作有几个
+                action_value[action] = get_q_value(row, col, action)
+
+            # compute how many actions achieve the maximum score in the current state
             count = (action_value == action_value.max()).sum()
-            #让这些动作均分概率
+            # evenly distribute probabilities among these actions.
             for action in range(4):
                 if action_value[action] == action_value.max():
                     new_pi[row, col, action] = 1 / count
@@ -63,18 +93,21 @@ def update_pi():
                     new_pi[row, col, action] = 0
     return new_pi
 
-# 循环迭代策略评估和策略提升,寻找最优解
 def train():
+    """
+    This function iterates in a loop between policy evaluation and policy improvement, seeking the optimal solution.
+
+    Returns:
+    The improved Pi function
+    """
     global pi
-    for _ in range(10):
-        for _ in range(100):
-            env.values = update_values('value_based')
+    for _ in range(5):
+        for _ in range(10):
+            env.values = update_v_value('value_based')
         pi = update_pi()
-
-
 
 if __name__ == '__main__':
     pi = np.ones([4, 12, 4]) * 0.25
-    env = CliffEnv()
-    train()
-    env.final_result(pi)
+    env = CliffEnv()   # create environment
+    train()  # train an optimal model
+    env.final_result(pi) # test the optimal model
