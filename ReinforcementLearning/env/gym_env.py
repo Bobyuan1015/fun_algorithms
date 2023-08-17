@@ -1,11 +1,12 @@
 import gym
 from matplotlib import pyplot as plt
-import cv2,os
+import cv2, os
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
-#定义环境
+
+
 class GymEnv(gym.Wrapper):
 
     def __init__(self):
@@ -20,6 +21,15 @@ class GymEnv(gym.Wrapper):
         return state
 
     def step(self, action):
+        """
+        This function takes an action in the game.
+
+        Parameters:
+        action
+
+        Returns:
+         state, reward, done, info
+        """
         state, reward, terminated, truncated, info = self.env.step(action)
         done = terminated or truncated
         self.step_n += 1
@@ -27,9 +37,9 @@ class GymEnv(gym.Wrapper):
             done = True
         return state, reward, done, info
 
-    # 打印游戏
     def show(self):
+        """
+        This function display the game.
+        """
         plt.imshow(self.env.render())
         plt.show()
-
-

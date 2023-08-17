@@ -1,6 +1,6 @@
+'''Dynamic programming algorithm requires complete knowledge of the environment, i.e., it's a model-based algorithm.'''
 import numpy as np
 from ReinforcementLearning.env.cliff_env import CliffEnv
-'''Dynamic programming algorithm requires complete knowledge of the environment, i.e., it's a model-based algorithm.'''
 
 def get_q_value(row, col, action):
     """
