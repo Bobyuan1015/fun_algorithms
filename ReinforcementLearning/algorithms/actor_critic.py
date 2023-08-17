@@ -1,58 +1,51 @@
-import torch,random
+
+import torch,random,time
 from IPython import display
 from ReinforcementLearning.env.gym_env import GymEnv
 
-def test(play):
-    # 初始化游戏
-    state = env.reset()
-    # 记录反馈值的和,这个值越大越好
-    reward_sum = 0
-    # 玩到游戏结束为止
-    over = False
-    while not over:
-        # 根据当前状态得到一个动作
-        action = get_action(state)
-        # 执行动作,得到反馈
-        state, reward, over, _ = env.step(action)
-        reward_sum += reward
-        # 打印动画
-        if play and random.random() < 0.2:  # 跳帧
-            display.clear_output(wait=True)
-            env.show()
-    return reward_sum
+def select_action(state):
+    """
+    This function selects an action based on the state.
 
-# 得到一个动作
-def get_action( state):
+    Parameters:
+    state
+
+    Returns:
+    int: index of selected action
+    """
     state = torch.FloatTensor(state).reshape(1, 4)
-    # [1, 4] -> [1, 2]
-    prob = model(state) #actor pi
-    # 根据概率选择一个动作
+    #[1, 4] -> [1, 2]
+    prob = model(state)
+
+    # Select an action based on probabilities.
     action = random.choices(range(2), weights=prob[0].tolist(), k=1)[0]
     return action
 
+
 def get_data():
+    '''Obtain data for a game session.'''
     states = []
     rewards = []
     actions = []
     next_states = []
     overs = []
 
-    # 初始化游戏
+    # Initialize the game.
     state = env.reset()
-    # 玩到游戏结束为止
+    # Play until the game is over.
     over = False
     while not over:
-        # 根据当前状态得到一个动作
-        action = get_action(state)
-        # 执行动作,得到反馈
+
+        action = select_action(state)
         next_state, reward, over, _ = env.step(action)
-        # 记录数据样本
+
+        # Record a data sample
         states.append(state)
         rewards.append(reward)
         actions.append(action)
         next_states.append(next_state)
         overs.append(over)
-        # 更新游戏状态,开始下一个动作
+
         state = next_state
 
     # [b, 4]
@@ -67,14 +60,46 @@ def get_data():
     overs = torch.LongTensor(overs).reshape(-1, 1)
     return states, rewards, actions, next_states, overs
 
+
+def test(play):
+    """
+    This function test performance of the new policy.
+
+    Parameters:
+    play: display game
+
+    Returns:
+    reward_sum: Sum of rewards.
+    """
+    state = env.reset()
+
+    reward_sum = 0
+    over = False
+    while not over:
+
+        action = select_action(state)
+        state, reward, over, _ = env.step(action)
+        reward_sum += reward
+
+        # skip frames and display animation.
+        if play and random.random() < 0.2:
+            display.clear_output(wait=True)
+            env.show()
+            time.sleep(1)
+    return reward_sum
+
 def train():
+    """
+    This function implements training process
+    """
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     optimizer_td = torch.optim.Adam(model_td.parameters(), lr=1e-2)
     loss_fn = torch.nn.MSELoss()
 
-    #玩N局游戏,每局游戏训练一次
+    # Play N games, training once per game.
     for i in range(1000):
-        #玩一局游戏,得到数据
+        # Play a game and obtain data
+
         #states -> [b, 4]
         #rewards -> [b, 1]
         #actions -> [b, 1]
@@ -82,7 +107,7 @@ def train():
         #overs -> [b, 1]
         states, rewards, actions, next_states, overs = get_data()
 
-        #计算values和targets
+        #Caculate values and targets for TD
         #[b, 4] -> [b ,1]
         values = model_td(states)
 
@@ -93,22 +118,21 @@ def train():
         #[b ,1] + [b ,1] -> [b ,1]
         targets += rewards
 
-        #时序差分误差
+        #td_error, do not gradient update
         #[b ,1] - [b ,1] -> [b ,1]
-        delta = (targets - values).detach()#不梯度更新
+        delta = (targets - values).detach()#
 
-        #重新计算对应动作的概率
+        # Recalculate the probability for the corresponding action
         #[b, 4] -> [b ,2]
         probs = model(states)
         #[b ,2] -> [b ,1]
         probs = probs.gather(dim=1, index=actions)
 
-        #根据策略梯度算法的导函数实现
-        #只是把公式中的reward_sum替换为了时序差分的误差（从而实现优化）, 因为reward_sum的方差比较大
+        '''the derivative of the policy gradient algorithm
+        Replace the "reward_sum" in the formula with temporal difference error (to achieve optimization),
+        because the variance of "reward_sum" is relatively high.'''
         #[b ,1] * [b ,1] -> [b ,1] -> scala
         loss = (-probs.log() * delta).mean()
-
-        #时序差分的loss就是简单的value和target求mse loss即可
         loss_td = loss_fn(values, targets.detach())
 
         optimizer.zero_grad()
@@ -124,20 +148,18 @@ def train():
             print(i, test_result)
 
 if __name__ == '__main__':
-    #定义模型
+
     model = torch.nn.Sequential(
         torch.nn.Linear(4, 128),
         torch.nn.ReLU(),
         torch.nn.Linear(128, 2),
         torch.nn.Softmax(dim=1),
     )
-
     model_td = sequential = torch.nn.Sequential(
         torch.nn.Linear(4, 128),
         torch.nn.ReLU(),
         torch.nn.Linear(128, 1),
     )
-
     env = GymEnv()
     env.reset()
     train()

@@ -1,110 +1,111 @@
-import gym, torch, random
+'''Policy gradient doesn't compute Q-values; it adjusts different action probabilities based on rewards.'''
+import time, torch, random
 from IPython import display
-
 from ReinforcementLearning.env.gym_env import GymEnv
 
 
-#得到一个动作
-def get_action(state):
-    state = torch.FloatTensor(state).reshape(1, 4)
 
+def select_action(state):
+    """
+    This function selects an action based on the state.
+
+    Parameters:
+    state
+
+    Returns:
+    int: index of selected action
+    """
+    state = torch.FloatTensor(state).reshape(1, 4)
     #[1, 4] -> [1, 2]
     prob = model(state)
 
-    #根据概率选择一个动作
+    # Select an action based on probabilities.
     action = random.choices(range(2), weights=prob[0].tolist(), k=1)[0]
-
     return action
 
-
-#得到一局游戏的数据
 def get_data():
+    '''Obtain data for a game session.'''
     states = []
     rewards = []
     actions = []
 
-    #初始化游戏
+    # Initialize the game.
     state = env.reset()
-
-    #玩到游戏结束为止
+    # Play until the game is over.
     over = False
     while not over:
-        #根据当前状态得到一个动作
-        action = get_action(state)
 
-        #执行动作,得到反馈
+        action = select_action(state)
         next_state, reward, over, _ = env.step(action)
 
-        #记录数据样本
+        # Record a data sample
         states.append(state)
         rewards.append(reward)
         actions.append(action)
 
-        #更新游戏状态,开始下一个动作
         state = next_state
 
     return states, rewards, actions
 
-
-
-
-
 def test(play):
-    #初始化游戏
+    """
+    This function test performance of the new policy.
+
+    Parameters:
+    play: display game
+
+    Returns:
+    reward_sum: Sum of rewards.
+    """
     state = env.reset()
 
-    #记录反馈值的和,这个值越大越好
     reward_sum = 0
-
-    #玩到游戏结束为止
     over = False
     while not over:
-        #根据当前状态得到一个动作
-        action = get_action(state)
 
-        #执行动作,得到反馈
+        action = select_action(state)
         state, reward, over, _ = env.step(action)
         reward_sum += reward
 
-        #打印动画
-        if play and random.random() < 0.2:  #跳帧
+        # skip frames and display animation.
+        if play and random.random() < 0.2:
             display.clear_output(wait=True)
             env.show()
-
+            time.sleep(1)
     return reward_sum
 
 def train():
+    """
+    This function implements training process
+    """
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    #玩N局游戏,每局游戏训练一次
+    # Play N games, training once per game.
     for epoch in range(1000):
-        #玩一局游戏,得到数据
+        # Play a game and obtain data
         states, rewards, actions = get_data()
-
         optimizer.zero_grad()
-
-        #反馈的和,初始化为0
         reward_sum = 0
 
-        #从最后一步算起
+        # Starting from the last step
         for i in reversed(range(len(states))):
 
-            #反馈的和,从最后一步的反馈开始计算
-            #每往前一步,>>和<<都衰减0.02,然后再加上当前步的反馈
+            # Cumulative feedback, calculated starting from the feedback of the last step.
             reward_sum *= 0.98
             reward_sum += rewards[i]
 
-            #重新计算对应动作的概率
+            # Recalculate the probabilities for corresponding actions.
             state = torch.FloatTensor(states[i]).reshape(1, 4)
             #[1, 4] -> [1, 2]
             prob = model(state)
             #[1, 2] -> scala
             prob = prob[0, actions[i]]
 
-            #根据求导公式,符号取反是因为这里是求loss,所以优化方向相反
+            # According to the derivative formula, the reversal of the sign is because we are calculating the loss,
+            # so the optimization direction is opposite.
             loss = -prob.log() * reward_sum
 
-            #累积梯度
+            # Accumulate gradients.
             loss.backward(retain_graph=True)
 
         optimizer.step()
@@ -116,16 +117,15 @@ def train():
 
 
 if __name__ == '__main__':
-    # 计算动作的模型,也是真正要用的模型
+
     type_network = ''
-    # 定义模型
+
     model = torch.nn.Sequential(
         torch.nn.Linear(4, 128),
         torch.nn.ReLU(),
         torch.nn.Linear(128, 2),
-        torch.nn.Softmax(dim=1),
+        torch.nn.Softmax(dim=1), # Probability distribution of actions.
     )
-
     env = GymEnv()
     env.reset()
     train()

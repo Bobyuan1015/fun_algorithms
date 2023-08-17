@@ -1,7 +1,15 @@
-'''Here is the implementation code for the Q-learning/Sarsa algorithm.'''
+'''Here is the implementation code for the n-step SARSA algorithm.
+DynAQ (Dynamic Programming for Adaptive Q-learning) is a reinforcement learning algorithm aimed at enhancing 
+the efficiency of Q-learning by combining experience data with traditional dynamic programming. The DynAQ 
+algorithm dynamically constructs subsets of value function updates to reduce computational costs and accelerate 
+the learning process. The core idea of DynAQ is to choose a subset of the value function to update based on previous
+experience data and new experience data at each time step, allowing for more efficient learning while maintaining
+accurate value function estimates. This approach enables DynAQ to potentially find approximate optimal policies faster
+in certain scenarios compared to traditional Q-learning algorithms.'''
 import random
 import numpy as np
 from ReinforcementLearning.env.cliff_env import CliffEnv
+
 
 
 def select_action(row, col):
@@ -22,9 +30,9 @@ def select_action(row, col):
     return Q[row, col].argmax()
 
 
-def get_update(alogrithm, row, col, action, reward, next_row, next_col, next_action):
+def get_update(alogrithm, row, col, action, reward, next_row, next_col):
     """
-    This function updates the Q score; each update depends on the current cell, current action, next cell, and the next cell's action -> SARSA.
+    This function updates the Q score; each update depends on the current cell, current action,reward, next cell -> SARSA.
 
     Parameters:
     alogrithm: Q learning or Sarsa
@@ -32,19 +40,13 @@ def get_update(alogrithm, row, col, action, reward, next_row, next_col, next_act
     action
     reward
     next_state(next_row，next_col)
-    next_action
 
     Returns:
     value of Q's update
     """
-    if alogrithm == 'sarsa':
-        # Calculate the target.
-        target = 0.9 * Q[next_row, next_col, next_action]
-    elif alogrithm == 'Q':
+    if alogrithm == 'Q'| 'dynaq':
         # The target is the highest score in the next cell
         target = 0.9 * Q[next_row, next_col].max()
-    else:
-        target = 0
     target += reward
 
     # Calculate the value by directly looking up the Q-table.
@@ -61,6 +63,16 @@ def get_update(alogrithm, row, col, action, reward, next_row, next_col, next_act
 
     return loss
 
+
+def dynaq():
+    '''Updating Q-values using historical data.
+    aimed at enhancing the efficiency of Q-learning by combining experience data with traditional dynamic programming
+    '''
+    for _ in range(20):
+        row, col, action = random.choice(list(history.keys()))
+        next_row, next_col, reward = history[(row, col, action)]
+        update = get_update('dynaq',row, col, action, reward, next_row, next_col)
+        Q[row, col, action] += update
 
 def train():
     """
@@ -87,22 +99,29 @@ def train():
             next_action = select_action(next_row, next_col)
 
             # Update score
-            update = get_update('Q', row, col, action, reward, next_row, next_col, next_action)
-
+            update = get_update('Q', row, col, action, reward, next_row, next_col)
             Q[row, col, action] += update
+
+            #--------------------------------------
+            # Save the data.
+            history[(row, col, action)] = next_row, next_col, reward
+            dynaq()
+            # --------------------------------------
 
             # Update the current position.
             row = next_row
             col = next_col
             action = next_action
 
-        if epoch % 150 == 0:
+        if epoch % 20 == 0:
             print(epoch, reward_sum)
 
 
 if __name__ == '__main__':
-    # Initialize the scores for taking each action in every cell, all initialized to 0, because there is no prior knowledge.
+    # Initialize the scores for taking each action in every cell, all initialized to 0, as there is no prior knowledge.
     Q = np.zeros([4, 12, 4])
+    # Save historical data where the keys are [row, col, action]= (next_row, next_col, reward).
+    history = dict()
     env = CliffEnv()
     train()
     env.final_result(Q)
