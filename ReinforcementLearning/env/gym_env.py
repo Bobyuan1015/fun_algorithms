@@ -1,6 +1,6 @@
 import gym
 from matplotlib import pyplot as plt
-import cv2, os
+import os
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
@@ -9,10 +9,11 @@ for k, v in os.environ.items():
 
 class GymEnv(gym.Wrapper):
 
-    def __init__(self):
-        env = gym.make('CartPole-v1', render_mode='rgb_array')
+    def __init__(self, name='CartPole-v1', continuous=0):
+        env = gym.make(name, render_mode='rgb_array')
         super().__init__(env)
         self.env = env
+        self.continuous = continuous
         self.step_n = 0
 
     def reset(self):
@@ -30,7 +31,10 @@ class GymEnv(gym.Wrapper):
         Returns:
          state, reward, done, info
         """
-        state, reward, terminated, truncated, info = self.env.step(action)
+        if self.continuous == 1:
+            state, reward, terminated, truncated, info = self.env.step([action])
+        else:
+            state, reward, terminated, truncated, info = self.env.step(action)
         done = terminated or truncated
         self.step_n += 1
         if self.step_n >= 200:

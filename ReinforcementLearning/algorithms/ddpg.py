@@ -1,6 +1,8 @@
 import torch, random, time
 from IPython import display
 from ReinforcementLearning.env.gym_env import GymEnv
+from ReinforcementLearning.utils.tools import update_data, soft_update
+
 
 def select_action(state):
     """
@@ -75,31 +77,7 @@ def get_loss_action(state):
     '''Use the value network to evaluate the value of actions, where higher values are better. 
     Since we are calculating the loss here and lower loss is better, the sign is negated.  [b, 4] -> [b, 1] -> [1]'''
     loss = -model_value(input).mean()
-
     return loss
-
-
-def soft_update(model, model_next):
-    '''partially update the model's parameters to the model_next instead of updating all of them.'''
-    for param, param_next in zip(model.parameters(), model_next.parameters()):
-        # Update with a small proportion.
-        value = param_next.data * 0.995 + param.data * 0.005
-        param_next.data.copy_(value)
-
-
-def update_data():
-    '''Add N pieces of data to the experience replay buffer and remove the oldest M pieces of data.'''
-
-    state = env.reset()
-    over = False
-    while not over:
-        action = select_action(state)
-        next_state, reward, over, _ = env.step([action])
-        datas.append((state, action, reward, next_state, over))
-        state = next_state
-
-    while len(datas) > 10000:
-        datas.pop(0)
 
 
 class Model(torch.nn.Module):
@@ -157,7 +135,7 @@ def train():
 
     for epoch in range(200):
 
-        update_data()
+        update_data(env,select_action,datas)
 
         # After each data update, perform N learning iterations.
         for i in range(200):

@@ -1,8 +1,9 @@
 import gym, torch, random, os, time, cv2
 from matplotlib import pyplot as plt
-from IPython import display
+
 
 from ReinforcementLearning.env.gym_env import GymEnv
+from ReinforcementLearning.utils.tools import get_sample
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
@@ -105,32 +106,6 @@ def test_env():
     # over= False
 
 
-def test(play):
-    """
-    This function test performance of the new policy.
-
-    Parameters:
-    play: display game
-
-    Returns:
-    reward_sum: Sum of rewards.
-    """
-    state = env.reset()
-
-    reward_sum = 0
-    over = False
-    while not over:
-
-        action = select_action(state)
-        state, reward, over, _ = env.step(action)
-        reward_sum += reward
-
-        # skip frames and display animation.
-        if play and random.random() < 0.2:
-            display.clear_output(wait=True)
-            env.show()
-            time.sleep(1)
-    return reward_sum
 
 def select_action(state):
     """
@@ -173,20 +148,7 @@ def update_data():
         datas.pop(0)
     return update_count, drop_count
 
-def get_sample():
-    '''Sampling from the experience replay buffer.'''
-    samples = random.sample(datas, 64)
-    # [b, 4]
-    state = torch.FloatTensor([i[0] for i in samples]).reshape(-1, 4)
-    # [b, 1]
-    action = torch.LongTensor([i[1] for i in samples]).reshape(-1, 1)
-    # [b, 1]
-    reward = torch.FloatTensor([i[2] for i in samples]).reshape(-1, 1)
-    # [b, 4]
-    next_state = torch.FloatTensor([i[3] for i in samples]).reshape(-1, 4)
-    # [b, 1]
-    over = torch.LongTensor([i[4] for i in samples]).reshape(-1, 1)
-    return state, action, reward, next_state, over
+
 
 def get_qvalue(state, action):
     """
@@ -272,7 +234,7 @@ def train():
         # After each data update, perform N learning iterations.
         for i in range(200):
             # Sample a batch of data.
-            state, action, reward, next_state, over = get_sample()
+            state, action, reward, next_state, over = get_sample(datas)
 
             value = get_qvalue(state, action)
             target = get_target(reward, next_state, over)
@@ -315,4 +277,4 @@ if __name__ == '__main__':
     env = GymEnv()
     env.reset()
     train()
-    test(play=True)
+    test(env,select_action,play=True)
