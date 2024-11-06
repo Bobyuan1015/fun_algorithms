@@ -1,10 +1,4 @@
-
-
-
 import random
-
-
-
 
 #数据池
 def random_pic(pool_list):

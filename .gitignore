@@ -1,0 +1,52 @@
+# Python bytecode files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Mac OS specific
+.DS_Store
+
+# Windows specific
+Thumbs.db
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# pytest cache
+.cache/
+
+# Pylint reports
+pylint-report.txt
+pylint-global.txt
+
+# mypy type checker
+.mypy_cache/
+
+# Coverage directory
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+
+# Dist files
+*.tar.gz
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Logs, Data, and Models directories
+logs/
+data/
+models/
+wandb/

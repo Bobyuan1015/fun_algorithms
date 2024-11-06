@@ -25,13 +25,7 @@ import time
 import random
 import numpy as np
 
-
-
-
-from rl import utils
-from rl.memory import Memory
-from rl.agents.base_agent import Agent
-
+from rl.tsp.base_agent import Agent
 
 
 class QAgent(Agent):

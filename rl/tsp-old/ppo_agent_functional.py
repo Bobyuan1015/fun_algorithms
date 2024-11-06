@@ -1,13 +1,13 @@
 import os
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 
-from rl.agents.base_agent import Agent
-from rl.memory import Memory
+from confs.path_conf import system_model_dir
+from rl.tsp.base_agent import Agent
+from rl.tsp.memory import Memory
 
 USE_SHARED_Q_V_NETS = True
 USE_TOTAL_LOSS = False
@@ -32,7 +32,7 @@ class PPOAgent(Agent):
         self.best_avg_reward = -float('inf')  # Initialize best average reward
 
         # Define model saving path
-        self.model_path = "ppo_agent.pth"
+        self.model_path = f"{system_model_dir}ppo_agent.pth"
 
         if self.use_shared_network:
             self.policy_value_network = self.build_shared_model(states_size, actions_size)

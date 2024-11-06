@@ -1,6 +1,9 @@
 import logging
 from datetime import datetime
 
+from confs.path_conf import system_log_dir
+
+
 class Logger:
     def __init__(self, pre_file):
         # 设置 logging 配置
@@ -13,7 +16,7 @@ class Logger:
         date_string = now.strftime("%Y-%m-%d")
 
         # 创建文件处理器
-        file_handler = logging.FileHandler(f"{pre_file}/{date_string}.log")
+        file_handler = logging.FileHandler(f"{system_log_dir}/{pre_file}/{date_string}.log")
         file_handler.setLevel(logging.INFO)
 
         # 创建控制台处理器

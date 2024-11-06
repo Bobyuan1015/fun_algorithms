@@ -5,8 +5,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from rl.memory import Memory
-from rl.agents.base_agent import Agent
+
+from confs.path_conf import system_model_dir
+from rl.tsp.base_agent import Agent
+from rl.tsp.memory import Memory
 
 
 class DQNAgent(Agent):
@@ -41,7 +43,7 @@ class DQNAgent(Agent):
         self.best_avg_reward = -float('inf')  # Initialize to negative infinity
 
         # Define the path to save the model
-        self.model_path = "dqn_agent.pth"
+        self.model_path = f"{system_model_dir}qn_agent.pth"
 
         # Build the model and optimizer
         self.model = self.build_model(states_size, actions_size)
