@@ -179,13 +179,13 @@ class QLearningAgent:
             self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
             #
             # print(f"episodetest={episode} ε={self.epsilon} q_change={q_change}  R={total_reward} {current_path_distance} "
-            #       f"{self.tsp.visited} best:{best_distance} {best_path}")
+            #       f"{self.tsp-old.visited} best:{best_distance} {best_path}")
         # 绘制 Q 值变化曲线
         self.plot_q_values(min_q_values, max_q_values, mean_q_values)
         return best_path, best_distance,episode
 # class QLearningAgent:
-#     def __init__(self, tsp, alpha=0, gamma=0.95, epsilon=1.0, epsilon_decay=0.998, min_epsilon=0.01):
-#         self.tsp = tsp
+#     def __init__(self, tsp-old, alpha=0, gamma=0.95, epsilon=1.0, epsilon_decay=0.998, min_epsilon=0.01):
+#         self.tsp-old = tsp-old
 #         self.alpha = alpha
 #         self.gamma = gamma
 #         self.epsilon = epsilon
@@ -200,7 +200,7 @@ class QLearningAgent:
 #         if done:
 #             new_q = (1 - self.alpha) * self.get_q_value(state, action) + self.alpha * reward
 #         else:
-#             next_actions = [a for a in range(self.tsp.n) if a not in self.tsp.visited]
+#             next_actions = [a for a in range(self.tsp-old.n) if a not in self.tsp-old.visited]
 #             best_next_q = max([self.get_q_value(next_state, a) for a in next_actions], default=0)
 #             new_q = (1 - self.alpha) * self.get_q_value(state, action) + self.alpha * (
 #                     reward + self.gamma * best_next_q)
@@ -208,7 +208,7 @@ class QLearningAgent:
 #         self.q_table[(state, action)] = new_q
 #
 #     def act(self, state):
-#         unvisited = [a for a in range(self.tsp.n) if a not in self.tsp.visited]
+#         unvisited = [a for a in range(self.tsp-old.n) if a not in self.tsp-old.visited]
 #         if np.random.rand() < self.epsilon:
 #             return np.random.choice(unvisited) if unvisited else None
 #         else:
@@ -225,23 +225,23 @@ class QLearningAgent:
 #         generation = 0
 #
 #         for episode in range(episodes):
-#             current_state = self.tsp.reset()
+#             current_state = self.tsp-old.reset()
 #             done = False
 #             total_reward = 0
 #
 #             while not done:
 #                 action = self.act(current_state)
-#                 reward, done, next_state = self.tsp.step(action)
+#                 reward, done, next_state = self.tsp-old.step(action)
 #                 self.update_q_value(current_state, action, reward, next_state, done)
 #                 current_state = next_state
 #                 total_reward += reward
 #
-#             current_path_distance = self.tsp.total_distance(self.tsp.visited)
+#             current_path_distance = self.tsp-old.total_distance(self.tsp-old.visited)
 #
 #             if total_reward > best_reward:
 #                 best_reward = total_reward
 #                 reward_not_improving = 0
-#                 best_path = self.tsp.visited
+#                 best_path = self.tsp-old.visited
 #             else:
 #                 reward_not_improving += 1
 #                 print(f"Stopping reward_not_improving  {reward_not_improving}")
@@ -262,7 +262,7 @@ class QLearningAgent:
 #             # ε 衰减
 #             self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 #
-#             print(f"{episode} ε={self.epsilon} R={total_reward} {current_path_distance} {self.tsp.visited} best:{best_distance} {best_path}")
+#             print(f"{episode} ε={self.epsilon} R={total_reward} {current_path_distance} {self.tsp-old.visited} best:{best_distance} {best_path}")
 #
 #         return best_path, best_distance, generation
 
