@@ -6,6 +6,8 @@ import torch.optim as optim
 import wandb
 import os
 
+from confs.path_conf import system_rl_model_dir
+
 # Initialize wandb
 wandb.init(project="DDPG-Pendulum", config={"episodes": 100, "max_timesteps": 200})
 
@@ -79,8 +81,8 @@ class ReplayBuffer(object):
 class DDPG(object):
     def __init__(self, state_dim, action_dim, max_action, load_model=False):
         # Model paths
-        self.actor_model_path = "actor.pth"
-        self.critic_model_path = "critic.pth"
+        self.actor_model_path = system_rl_model_dir+"ddpg_actor.pkl"
+        self.critic_model_path = system_rl_model_dir+"ddpg_critic.pkl"
 
         # Actor network and target network
         self.actor = Actor(state_dim, action_dim, max_action).to(device)

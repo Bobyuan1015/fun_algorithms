@@ -6,6 +6,8 @@ import torch.optim as optim
 import wandb
 import os
 
+from confs.path_conf import system_rl_model_dir
+
 # Initialize wandb
 wandb.init(project="DuelingDQN-CartPole", config={"episodes": 500, "max_timesteps": 200})
 
@@ -93,7 +95,7 @@ class DuelingDQNAgent:
         self.best_reward = -np.inf
 
         # Model paths
-        self.model_path = "dueling_dqn_model.pth"
+        self.model_path = system_rl_model_dir+"dueling_dqn_model.pkl"
 
         # Define Dueling DQN networks
         self.q_network = DuelingDQN(state_dim, action_dim).to(device)
