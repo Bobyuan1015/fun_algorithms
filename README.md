@@ -8,7 +8,7 @@
 - [ ] Organize experiment results  
 
 ## Issues shot
-pip install pandas numpy tensorflow tqdm imageio tqdm imageio matplotlib scipy
+pip install pandas numpy tensorflow tqdm imageio tqdm imageio matplotlib scipy  
 pip install torch torchvision torchaudio   -i  https://pypi.tuna.tsinghua.edu.cn/simple
 pip install gym[classic_control] -i https://pypi.tuna.tsinghua.edu.cn/simple
 
