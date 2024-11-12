@@ -11,6 +11,7 @@ system_data_dir = project_root + '/data/'
 system_model_dir = project_root + '/models/'
 system_rl_model_dir = project_root + '/models/rl/'
 system_ex_model_dir = project_root + '/models/ex/'
+system_ex_comparison_model_dir = system_ex_model_dir + 'comparison/'
 
 
 def ensure_directory_exists(directory_path):
@@ -26,7 +27,9 @@ ensure_directory_exists(system_experience_dir)
 ensure_directory_exists(system_model_dir)
 ensure_directory_exists(system_rl_model_dir)
 ensure_directory_exists(system_ex_model_dir)
+ensure_directory_exists(system_ex_comparison_model_dir)
 
 if __name__ == '__main__':
     print(system_data_dir)
+
 

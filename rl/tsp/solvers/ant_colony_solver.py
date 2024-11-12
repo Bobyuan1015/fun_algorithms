@@ -43,6 +43,7 @@ class AntColony:
     def construct_solution(self):
         solution = []
         visited = set()
+        #starting city
         current_city = random.randint(0, self.num_cities - 1)
         solution.append(current_city)
         visited.add(current_city)
@@ -59,7 +60,7 @@ class AntColony:
         heuristic = 1 / (self.distance_matrix[current_city] + 1e-10)
         pheromone = np.power(pheromone, self.alpha)
         heuristic = np.power(heuristic, self.beta)
-        probabilities = pheromone * heuristic
+        probabilities = pheromone * heuristic #todo
         probabilities[list(visited)] = 0
         total = np.sum(probabilities)
         if total == 0:
@@ -80,4 +81,3 @@ class AntColony:
                 to_city = solution[(i + 1) % self.num_cities]
                 self.pheromone[from_city, to_city] += self.Q / distance
                 self.pheromone[to_city, from_city] += self.Q / distance  # Assuming undirected graph
-

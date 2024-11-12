@@ -1,6 +1,8 @@
 import time
 import csv
 import matplotlib.pyplot as plt
+
+from confs.path_conf import system_ex_comparison_model_dir
 from rl.env.tsp_env import TSPEnv
 from rl.tsp.solvers.ant_colony_solver import AntColony
 from rl.tsp.solvers.genetic_solver import GeneticAlgorithm
@@ -56,7 +58,7 @@ def save_fitness_history_to_csv(fitness_histories):
     """
     for algo, history in fitness_histories.items():
         # Create a filename by replacing spaces with underscores and converting to lowercase
-        filename = f"fitness_history_{algo.replace(' ', '_').lower()}.csv"
+        filename = f"{system_ex_comparison_model_dir}/fitness_history_{algo.replace(' ', '_').lower()}.csv"
         with open(filename, mode='w', newline='') as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(['Iteration', 'Best Distance'])
@@ -110,7 +112,7 @@ def main():
         print(f"{algo}: Best Distance = {res['Distance']:.2f}, Time Taken = {res['Time']:.2f} seconds")
 
     # Save Summary Results to CSV
-    save_results_to_csv(results, filename='results.csv')
+    save_results_to_csv(results, filename=system_ex_comparison_model_dir+'results.csv')
 
     # Save Convergence Histories to CSV
     save_fitness_history_to_csv(fitness_histories)
