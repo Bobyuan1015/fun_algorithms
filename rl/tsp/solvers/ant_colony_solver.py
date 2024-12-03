@@ -1,4 +1,3 @@
-# algorithms/ant_colony.py
 
 import numpy as np
 import random
@@ -60,7 +59,7 @@ class AntColony:
         heuristic = 1 / (self.distance_matrix[current_city] + 1e-10)
         pheromone = np.power(pheromone, self.alpha)
         heuristic = np.power(heuristic, self.beta)
-        probabilities = pheromone * heuristic #todo
+        probabilities = pheromone * heuristic
         probabilities[list(visited)] = 0
         total = np.sum(probabilities)
         if total == 0:

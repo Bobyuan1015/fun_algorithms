@@ -6,6 +6,7 @@ from confs.path_conf import system_ex_comparison_model_dir
 from rl.env.tsp_env import TSPEnv
 from rl.tsp.solvers.ant_colony_solver import AntColony
 from rl.tsp.solvers.genetic_solver import GeneticAlgorithm
+from rl.tsp.solvers.qlearning import QLearningTSP
 from rl.tsp.solvers.simulated_annealing_solver import SimulatedAnnealing
 
 
@@ -72,13 +73,27 @@ def main():
     Main function to run the comparison experiment between different TSP algorithms.
     """
     # Initialize TSP Environment
-    env = TSPEnv(num_cities=30, use_tsplib=False)  # Adjust the number of cities as needed
+    # env = TSPEnv(num_cities=30, use_tsplib=False)  # Adjust the number of cities as needed
+    env = TSPEnv(use_tsplib=True)
+    true_best_distance = env.calculate_tour_distance(opt_tour=True)
+    true_best_tour = env.opt_tour
     print(f"TSP Environment initialized with {env.num_cities} cities.")
 
     # Dictionaries to store results and fitness histories
     results = {}
     fitness_histories = {}
 
+    # Q Learning
+    qTable = QLearningTSP(env, episodes=500000, alpha=0.5, gamma=0.995, epsilon=1, epsilon_decay=0.999, min_epsilon=0.1)
+    #todo gamma=0效果好，短视？
+    start_time = time.time()
+    qTable_solution, qTable_distance, qTable_history = qTable.run()
+    qTable_time = time.time() - start_time
+    results['Q-Learning Algorithm'] = {'Distance': qTable_distance, 'Time': qTable_time}
+    fitness_histories['Q-Learning Algorithm'] = qTable_history
+    print(f"Q-Learning Algorithm: Best Distance = {qTable_distance:.2f} vs ture{true_best_distance}, Time Taken = {qTable_time:.2f} seconds \n{qTable_solution} vs\n{true_best_tour}")
+
+    return
     # Genetic Algorithm
     ga = GeneticAlgorithm(env, population_size=200, generations=1000, mutation_rate=0.02, crossover_rate=0.9)
     start_time = time.time()

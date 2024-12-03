@@ -1,4 +1,3 @@
-# algorithms/simulated_annealing.py
 
 import numpy as np
 import random

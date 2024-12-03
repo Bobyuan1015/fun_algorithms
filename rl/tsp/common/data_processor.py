@@ -44,7 +44,7 @@ def adjust_reward(reward_params, reward_strategy, history_best_distance):
     elif reward_strategy == "negative_distance_with_return_bonus":
         reward = -distance + (10 if done else 0)
     elif reward_strategy == "negative_distance_return_with_best_bonus":
-        reward = -distance + (5 if done and total_distance < history_best_distance else 0)
+        reward = -distance + (10 if done and total_distance < history_best_distance else 0)
     elif reward_strategy == "zero_step_final_bonus":
         reward = 0 if not done else 50 / total_distance
     elif reward_strategy == "zero_step_final_bonus_best_path":

@@ -1,4 +1,3 @@
-# algorithms/genetic_algorithm.py
 
 import numpy as np
 import random
@@ -69,7 +68,8 @@ class GeneticAlgorithm:
         Calculate the fitness of an individual.
 
         Fitness is defined as the inverse of the total distance of the tour.
-        A shorter distance results in a higher fitness value.
+
+        Core:A shorter distance results in a higher fitness value.
 
         Parameters:
             individual (List[int]): A permutation of city indices representing a tour.
@@ -130,7 +130,6 @@ class GeneticAlgorithm:
 
         # Select two random crossover points
         start, end = sorted(random.sample(range(self.num_cities), 2))
-
         # Initialize child with None to indicate unfilled positions
         child = [None] * self.num_cities
 
@@ -143,6 +142,8 @@ class GeneticAlgorithm:
         while None in child:
             if p2_index >= self.num_cities:
                 p2_index = 0  # Wrap around to the beginning if end is reached
+            if c_index >= self.num_cities:
+                c_index = 0  # Wrap around to the beginning if end is reached
             city = parent2[p2_index]
             if city not in child:
                 child[c_index] = city

@@ -1,13 +1,13 @@
 import numpy as np
 import pickle
 
-from confs.path_conf import system_model_dir
+from confs.path_conf import tsp_agents_data_dir
 from rl.tsp.agents.agent import BaseAgent
 
 
 class QLearningAgent(BaseAgent):
-    def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.1,
-                 reward_strategy="negative_distance", model_path=system_model_dir + "best_q-table.pkl"):
+    def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.5,
+                 reward_strategy="negative_distance", model_path=tsp_agents_data_dir + "best_q-table.pkl"):
         """
         Initialize the Q-Learning Agent.
 
@@ -21,7 +21,7 @@ class QLearningAgent(BaseAgent):
         """
         super().__init__(num_cities, num_actions, alpha, gamma, epsilon, reward_strategy, model_path)
 
-    def initialize_model(self):
+    def initialize_model(self):;
         """
         Initialize the Q-learning model by creating a Q-table with zeros.
         """

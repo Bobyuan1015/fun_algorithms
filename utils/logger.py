@@ -1,22 +1,28 @@
 import logging
+import os
 from datetime import datetime
 
 from confs.path_conf import system_log_dir
 
 
 class Logger:
-    def __init__(self, pre_file):
+    def __init__(self, pre_dir,pre_file):
         # 设置 logging 配置
-        self.logger = logging.getLogger(pre_file)
+        self.logger = logging.getLogger(pre_dir)
         self.logger.setLevel(logging.INFO)
         # 获取当前日期和时间
         now = datetime.now()
 
         # 将当前日期格式化为字符串
         date_string = now.strftime("%Y-%m-%d")
-
+        base_dir = f'{system_log_dir}/{pre_dir}'
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+            print(f"Directory '{base_dir}' created.")
+        else:
+            print(f"Directory '{base_dir}' already exists.")
         # 创建文件处理器
-        file_handler = logging.FileHandler(f"{system_log_dir}/{pre_file}/{date_string}.log")
+        file_handler = logging.FileHandler(f"{base_dir}/{pre_file}_{date_string}.log")
         file_handler.setLevel(logging.INFO)
 
         # 创建控制台处理器
