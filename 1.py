@@ -4,16 +4,15 @@ import pandas as pd
 import os
 from collections import defaultdict
 import itertools
-
 class QLearningTSP:
-    def __init__(self, cities, state_space_config="simple", alpha=0.1, gamma=0.9, epsilon=0.2,
+    def __init__(self, cities, state_space_config="step", alpha=0.1, gamma=0.9, epsilon=0.2,
                  episodes=1000, save_q_every=100):
         """
         Initialize the Q-Learning TSP solver.
 
         Parameters:
         - cities: 2D numpy array representing distances between cities.
-        - state_space_config: "simple" for current city only, "path" for visited cities.
+        - state_space_config: "step" for current city only, "visits" for visited cities.
         - alpha: Learning rate.
         - gamma: Discount factor.
         - epsilon: Exploration rate.
@@ -32,12 +31,14 @@ class QLearningTSP:
         # Initialize states and Q-table
         self.states = list(range(self.num_cities))
 
-        if self.state_space_config == "simple":
+        if self.state_space_config == "step":
             # Simple state: current city
             self.q_table = np.zeros((self.num_cities, self.num_cities))
-        elif self.state_space_config == "path":
+            self.strategy_matrix = np.zeros((self.num_cities, self.num_cities))
+        elif self.state_space_config == "visits":
             # Detailed state: visited cities as a tuple
             self.q_table = defaultdict(lambda: np.zeros(self.num_cities))
+            self.strategy_matrix = dict()
         else:
             raise ValueError("Invalid state_space_config. Choose 'simple' or 'path'.")
 
@@ -46,8 +47,31 @@ class QLearningTSP:
         self.average_rewards = []
         self.cumulative_rewards = []
         self.q_table_snapshots = []
-        self.q_value_changes = defaultdict(list) if self.state_space_config == "path" else {state: [] for state in self.states}
+        self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {state: [] for state in self.states}
         self.action_frequency = np.zeros((self.num_cities, self.num_cities))
+        self.action_frequencies = []
+        self.iteration_strategies = []
+        self.action_counts = {a:0 for a in self.states}
+
+    def update_strategy(self, state, action):
+        key  = tuple([str(i) for i in state])
+        if key not in self.strategy_matrix:
+            self.strategy_matrix[key] = {action:0}
+        elif action not in self.strategy_matrix[key]:
+            self.strategy_matrix[key][action] = 0
+
+        self.strategy_matrix[key][action] += 1
+
+    def get_strategy_matrix(self):
+        if self.state_space_config == "step":
+            return self.strategy_matrix
+        elif self.state_space_config == "visits":
+            strategy_matrix = np.zeros((self.num_cities, self.num_cities))
+            for state, actions in self.strategy_matrix.items():
+                current_city = int(state[-1])
+                for action, count in actions.items():
+                    strategy_matrix[current_city][action] = count
+            return strategy_matrix
 
     def _get_current_city(self, visited):
         """
@@ -61,16 +85,16 @@ class QLearningTSP:
         if np.random.rand() < self.epsilon:
             return np.random.choice(available_actions)
         else:
-            if self.state_space_config == "simple":
+            if self.state_space_config == "step":
                 q_values = self.q_table[current_city]
-            elif self.state_space_config == "path":
+            elif self.state_space_config == "visits":
                 state = tuple(visited)
                 q_values = self.q_table[state]
             available_q_values = {a: q_values[a] for a in available_actions}
             return max(available_q_values, key=available_q_values.get)
 
     def _update_q_table(self, visited, action, reward, next_visited):
-        if self.state_space_config == "simple":
+        if self.state_space_config == "step":
             state = self._get_current_city(visited)
             next_state = self._get_current_city(next_visited)
             current_q = self.q_table[state][action]
@@ -78,7 +102,7 @@ class QLearningTSP:
             updated_q = (1 - self.alpha) * current_q + self.alpha * (reward + self.gamma * next_max_q)
             self.q_table[state][action] = updated_q
             self.q_value_changes[state].append(updated_q)
-        elif self.state_space_config == "path":
+        elif self.state_space_config == "visits":
             state = tuple(visited)
             next_state = tuple(next_visited)
             current_q = self.q_table[state][action]
@@ -87,24 +111,25 @@ class QLearningTSP:
             self.q_table[state][action] = updated_q
             self.q_value_changes[state].append(updated_q)
 
+    def update_counts(self, action):
+        self.action_counts[int(action)] += 1
+
     def train(self):
         stable_episode = None
         for episode in range(self.episodes):
             start_city = np.random.choice(self.states)
             visited = [start_city]
-
             episode_reward = 0
 
             while len(visited) < self.num_cities:
                 action = self._choose_action(visited)
+                self.update_counts(action)
                 reward = -self.cities[self._get_current_city(visited)][action]
                 episode_reward += reward
-
                 next_visited = visited + [action]
-
                 self._update_q_table(visited, action, reward, next_visited)
-
                 self.action_frequency[self._get_current_city(visited)][action] += 1
+                self.update_strategy(visited, action)
                 visited = next_visited
 
             self.episode_rewards.append(episode_reward)
@@ -117,23 +142,28 @@ class QLearningTSP:
                     stable_episode = episode
 
             if (episode + 1) % self.save_q_every == 0:
-                if self.state_space_config == "simple":
+                if self.state_space_config == "step":
                     self.q_table_snapshots.append(self.q_table.copy())
-                elif self.state_space_config == "path":
-                    # 对于高维状态空间，可以采样一部分状态
+                elif self.state_space_config == "visits":
                     sampled_states = list(itertools.islice(self.q_table.items(), 100))  # 采样前100个状态
                     sampled_q_table = {state: q.copy() for state, q in sampled_states}
                     self.q_table_snapshots.append(sampled_q_table)
                 self.save_q_table(episode)
 
+            if episode % 100 == 0:  # Record frequencies every 100 steps
+                frequencies = [count / (episode + 1) for count in self.action_counts.values()]
+                self.action_frequencies.append(frequencies)
+                strategy_matrix = self.get_strategy_matrix()
+                self.iteration_strategies.append(strategy_matrix)
+
         print(f"Training converged at episode: {stable_episode}")
 
     def save_q_table(self, episode):
         os.makedirs("q_tables", exist_ok=True)
-        if self.state_space_config == "simple":
+        if self.state_space_config == "step":
             file_path = f"q_tables/q_table_simple_{episode + 1}.npy"
             np.save(file_path, self.q_table)
-        elif self.state_space_config == "path":
+        elif self.state_space_config == "visits":
             # 保存为字典形式
             file_path = f"q_tables/q_table_path_{episode + 1}.npy"
             # 由于 defaultdict 不能直接保存，需要转换为普通字典
@@ -163,10 +193,10 @@ class QLearningTSP:
 
     def plot_q_value_changes(self):
         plt.figure(figsize=(12, 6))
-        if self.state_space_config == "simple":
+        if self.state_space_config == "step":
             for state, q_values in self.q_value_changes.items():
                 plt.plot(q_values, label=f"State {state}")
-        elif self.state_space_config == "path":
+        elif self.state_space_config == "visits":
             # 绘制部分状态的 Q-value 变化
             sampled_states = list(itertools.islice(self.q_value_changes.items(), 10))  # 采样前10个状态
             for state, q_values in sampled_states:
@@ -184,11 +214,11 @@ class QLearningTSP:
 
         for i, q_table in enumerate(self.q_table_snapshots):
             plt.figure(figsize=(10, 8))
-            if self.state_space_config == "simple":
+            if self.state_space_config == "step":
                 plt.imshow(q_table, cmap='hot', interpolation='nearest')
                 plt.colorbar()
                 plt.title(f"Q-table at Episode {i * self.save_q_every + self.save_q_every}")
-            elif self.state_space_config == "path":
+            elif self.state_space_config == "visits":
                 # 对于高维 Q-table，只绘制采样状态
                 sampled_states = list(itertools.islice(q_table.items(), 100))
                 sampled_q = np.array([q for _, q in sampled_states])
@@ -208,8 +238,10 @@ class QLearningTSP:
         plt.ylabel("State")
         plt.show()
 
+
+
     def plot_q_value_trends(self):
-        if self.state_space_config == "simple":
+        if self.state_space_config == "step":
             x, y = np.meshgrid(range(self.num_cities), range(self.num_cities))
             q_values = self.q_table
             fig = plt.figure(figsize=(10, 8))
@@ -220,7 +252,7 @@ class QLearningTSP:
             ax.set_ylabel("Action")
             ax.set_zlabel("Q-value")
             plt.show()
-        elif self.state_space_config == "path":
+        elif self.state_space_config == "visits":
             # 聚合 Q-values 进行可视化
             # 示例：对采样状态的 Q-values 取平均
             sampled_q_tables = self.q_table_snapshots
@@ -251,32 +283,49 @@ class QLearningTSP:
         - policy: Dictionary mapping states to the best action.
         """
         policy = {}
-        if self.state_space_config == "simple":
+        if self.state_space_config == "step":
             for state in self.states:
                 best_action = np.argmax(self.q_table[state])
                 policy[state] = best_action
-        elif self.state_space_config == "path":
+        elif self.state_space_config == "visits":
             for state, q_values in self.q_table.items():
                 best_action = np.argmax(q_values)
                 policy[state] = best_action
         return policy
 
+    def plot_stategy(self):
+        plt.figure(figsize=(15, 6))
+        num_plots = len(self.iteration_strategies)
+        for i, strategy in enumerate(self.iteration_strategies):
+            plt.subplot(1, num_plots, i + 1)
+            cax = plt.imshow(strategy, cmap='hot', interpolation='nearest')
+            plt.title(f'Iteration {i * 100}')
+            plt.xticks(ticks=np.arange(self.num_cities), labels=np.arange(self.num_cities))
+            plt.yticks(ticks=np.arange(self.num_cities), labels=np.arange(self.num_cities))
+            plt.xlabel('Destination City')
+            plt.ylabel('Current City')
+            plt.colorbar(cax, fraction=0.046, pad=0.04)  # 添加颜色条
+        plt.tight_layout()
+        plt.show()
+
 if __name__ == "__main__":
-    num_cities = 5
-    state_type = "simple"
-    # state_type = "path"
+    num_cities = 3
+    state_type = "step"
+    state_type = "visits"
     cities = np.random.randint(10, 100, size=(num_cities, num_cities))
 
-    tsp_solver_detailed = QLearningTSP(cities, state_space_config=state_type, episodes=50, save_q_every=50)
+    tsp_solver_detailed = QLearningTSP(cities, state_space_config=state_type, episodes=200, save_q_every=50)
     tsp_solver_detailed.train()
-    tsp_solver_detailed.save_results()
-    tsp_solver_detailed.plot_results()
-    tsp_solver_detailed.plot_q_value_changes()
-    tsp_solver_detailed.plot_policy_evolution()
-    tsp_solver_detailed.plot_action_frequencies()
-    tsp_solver_detailed.plot_q_value_trends()
+    tsp_solver_detailed.plot_stategy()
+    # tsp_solver_detailed.save_results()
+    # tsp_solver_detailed.plot_results()
+    # tsp_solver_detailed.plot_q_value_changes()
+    # tsp_solver_detailed.plot_policy_evolution()
+    # tsp_solver_detailed.plot_action_frequencies()
+    # tsp_solver_detailed.plot_q_value_trends()
 
-todo list
-1.grid search最优参数
-2.动态配置reward
-3.运行数据
+
+# todo list
+# 1.grid search最优参数
+# 2.动态配置reward
+# 3.运行数据
