@@ -13,7 +13,6 @@ from utils.logger import Logger
 
 logger = Logger(pre_dir='ex_tsp',pre_file='QLearningTSP').logger
 
-
 class QLearningTSP:
     def __init__(self, env: TSPEnv, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.5, epsilon_decay=0.99,
                  min_epsilon=0.1, alpha_decay=0.995, min_alpha=0.1):

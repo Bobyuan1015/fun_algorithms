@@ -17,11 +17,10 @@ def evaluate(agent):
             print(next_state, base_reward, end)
         env.render(disappear=True)
 
-
 if __name__ == '__main__':
     num_cities = 10
     num_actions = num_cities
-    num_episodes = 100000
+    num_episodes = 1000
 
     env = TSPEnv(num_cities=num_cities)
     agent = QLearningAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
@@ -29,6 +28,12 @@ if __name__ == '__main__':
     # agent = ActorCriticAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
     # agent = PPOAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
 
-
     agent.train(env, num_episodes)
     # evaluate(agent)
+    agent.plot_stategy()
+    # agent.save_results()
+    # agent.plot_results()
+    # agent.plot_q_value_changes()
+    # agent.plot_policy_evolution()
+    # agent.plot_action_frequencies()
+    # agent.plot_q_value_trends()

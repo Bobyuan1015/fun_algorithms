@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import os
 import random
-from rl.tsp.common.data_processor import adjust_reward
+from rl.tsp.common.reward_policy import adjust_reward
 
 class BaseAgent(ABC):
     def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.1,

@@ -1,24 +1,138 @@
-import numpy as np
+from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import pandas as pd
+import random
+from rl.tsp.common.reward_policy import adjust_reward
+class BaseAgent(ABC):
+    def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.1,
+                 reward_strategy="negative_distance", model_path=None):
+        self.num_cities = num_cities
+        self.num_actions = num_actions
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.reward_strategy = reward_strategy
+        self.model_path = model_path
+        self.history_best_distance = float('inf')
+        self.initialize_model()
+        if self.model_path and os.path.exists(self.model_path):
+            self.load_model()
+        else:
+            print("Initialized new model.")
+
+    @abstractmethod
+    def initialize_model(self):
+        pass
+    @abstractmethod
+    def load_model(self):
+        pass
+    @abstractmethod
+    def save_model(self):
+        pass
+    @abstractmethod
+    def get_greedy_action(self, state):
+        pass
+    def choose_action(self, state, use_sample=True):
+        if use_sample and random.uniform(0, 1) < self.epsilon:
+            return random.randint(0, self.num_actions - 1)
+        else:
+            return self.get_greedy_action(state)
+    @abstractmethod
+    def update(self, state, action, reward, next_state, done):
+        pass
+    @abstractmethod
+    def train(self, env, num_episodes):
+        pass
+    def adjust_reward(self, reward_params):
+        return adjust_reward(reward_params, self.reward_strategy, self.history_best_distance)
+
+import pickle
+from confs.path_conf import tsp_agents_data_dir
+from rl.tsp.agents.agent import BaseAgent
+class QLearningAgent(BaseAgent):
+    def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.5,
+                 reward_strategy="negative_distance", model_path=tsp_agents_data_dir + "best_q-table.pkl"):
+        super().__init__(num_cities, num_actions, alpha, gamma, epsilon, reward_strategy, model_path)
+    def initialize_model(self):
+        self.q_table = np.zeros((self.num_cities, self.num_actions))  # Initialize Q-table
+        print("Initialized new Q-learning model.")
+    def load_model(self):
+        try:
+            with open(self.model_path, 'rb') as f:
+                saved_data = pickle.load(f)
+                if saved_data["num_cities"] == self.num_cities:
+                    self.q_table = saved_data["q_table"]
+                    self.history_best_distance = saved_data["history_best_distance"]
+                    print("Loaded existing Q-learning model.")
+                else:
+                    print(f"Model file found, but num_cities mismatch: expected {self.num_cities}, got {saved_data['num_cities']}. Initializing new model.")
+                    self.initialize_model()
+        except FileNotFoundError:
+            print(f"Model path {self.model_path} does not exist. Initializing new Q-learning model.")
+            self.initialize_model()
+        except Exception as e:
+            print(f"Error loading model: {e}. Initializing new Q-learning model.")
+            self.initialize_model()
+    def save_model(self):
+        saved_data = {
+            "num_cities": self.num_cities,
+            "q_table": self.q_table,
+            "history_best_distance": self.history_best_distance
+        }
+        try:
+            with open(self.model_path, 'wb') as f:
+                pickle.dump(saved_data, f)
+            print(f"Model saved with distance: {self.history_best_distance}")
+        except Exception as e:
+            print(f"Error saving model: {e}")
+    def get_greedy_action(self, state):
+        state_index = self.state_to_index(state)
+        return np.argmax(self.q_table[state_index])
+    def state_to_index(self, state):
+        return state['current_city']
+    def update(self, state, action, reward, next_state, done):
+        current_index = self.state_to_index(state)
+        next_index = self.state_to_index(next_state)
+        best_next_action = np.argmax(self.q_table[next_index])
+        td_target = reward + self.gamma * self.q_table[next_index, best_next_action] * (1 - done)
+        td_error = td_target - self.q_table[current_index, action]
+        self.q_table[current_index, action] += self.alpha * td_error
+    def train(self, env, num_episodes):
+        for episode in range(num_episodes):
+            state = env.reset()
+            total_distance = 0
+            done = False
+            visited = []
+            print(f"Episode {episode + 1}/{num_episodes} - Training")
+            while not done:
+                action = self.choose_action(state)
+                next_state, base_reward, done = env.step(action)
+                reward_params = {
+                    "distance": next_state['step_distance'],
+                    "done": done,
+                    "total_distance": next_state['total_distance'],
+                    "visited": next_state['current_path'],
+                    "env": env
+                }
+                reward = self.adjust_reward(reward_params)
+                self.update(state, action, reward, next_state, done)
+                state = next_state
+                visited.append(state['current_city'])
+                total_distance = env.total_distance
+
+            if total_distance < self.history_best_distance:
+                self.history_best_distance = total_distance
+                self.save_model()
+
+import numpy as np
 import os
 from collections import defaultdict
 import itertools
+from utils.logger import Logger
+log = Logger("reward", '1').get_logger()
 class QLearningTSP:
     def __init__(self, cities, state_space_config="step", alpha=0.1, gamma=0.9, epsilon=0.2,
                  episodes=1000, save_q_every=100):
-        """
-        Initialize the Q-Learning TSP solver.
-
-        Parameters:
-        - cities: 2D numpy array representing distances between cities.
-        - state_space_config: "step" for current city only, "visits" for visited cities.
-        - alpha: Learning rate.
-        - gamma: Discount factor.
-        - epsilon: Exploration rate.
-        - episodes: Number of training episodes.
-        - save_q_every: Interval of episodes to save Q-table snapshots.
-        """
         self.cities = cities
         self.num_cities = len(cities)
         self.state_space_config = state_space_config
@@ -27,10 +141,7 @@ class QLearningTSP:
         self.epsilon = epsilon
         self.episodes = episodes
         self.save_q_every = save_q_every
-
-        # Initialize states and Q-table
         self.states = list(range(self.num_cities))
-
         if self.state_space_config == "step":
             # Simple state: current city
             self.q_table = np.zeros((self.num_cities, self.num_cities))
@@ -41,8 +152,6 @@ class QLearningTSP:
             self.strategy_matrix = dict()
         else:
             raise ValueError("Invalid state_space_config. Choose 'simple' or 'path'.")
-
-        # Data recording
         self.episode_rewards = []
         self.average_rewards = []
         self.cumulative_rewards = []
@@ -52,16 +161,13 @@ class QLearningTSP:
         self.action_frequencies = []
         self.iteration_strategies = []
         self.action_counts = {a:0 for a in self.states}
-
     def update_strategy(self, state, action):
         key  = tuple([str(i) for i in state])
         if key not in self.strategy_matrix:
             self.strategy_matrix[key] = {action:0}
         elif action not in self.strategy_matrix[key]:
             self.strategy_matrix[key][action] = 0
-
         self.strategy_matrix[key][action] += 1
-
     def get_strategy_matrix(self):
         if self.state_space_config == "step":
             return self.strategy_matrix
@@ -72,11 +178,7 @@ class QLearningTSP:
                 for action, count in actions.items():
                     strategy_matrix[current_city][action] = count
             return strategy_matrix
-
     def _get_current_city(self, visited):
-        """
-        获取当前城市，即访问过的最后一个城市。
-        """
         return visited[-1]
 
     def _choose_action(self, visited):
@@ -92,7 +194,6 @@ class QLearningTSP:
                 q_values = self.q_table[state]
             available_q_values = {a: q_values[a] for a in available_actions}
             return max(available_q_values, key=available_q_values.get)
-
     def _update_q_table(self, visited, action, reward, next_visited):
         if self.state_space_config == "step":
             state = self._get_current_city(visited)
@@ -110,17 +211,14 @@ class QLearningTSP:
             updated_q = (1 - self.alpha) * current_q + self.alpha * (reward + self.gamma * next_max_q)
             self.q_table[state][action] = updated_q
             self.q_value_changes[state].append(updated_q)
-
     def update_counts(self, action):
         self.action_counts[int(action)] += 1
-
     def train(self):
         stable_episode = None
         for episode in range(self.episodes):
             start_city = np.random.choice(self.states)
             visited = [start_city]
             episode_reward = 0
-
             while len(visited) < self.num_cities:
                 action = self._choose_action(visited)
                 self.update_counts(action)
@@ -131,16 +229,13 @@ class QLearningTSP:
                 self.action_frequency[self._get_current_city(visited)][action] += 1
                 self.update_strategy(visited, action)
                 visited = next_visited
-
             self.episode_rewards.append(episode_reward)
             self.cumulative_rewards.append(sum(self.episode_rewards))
             self.average_rewards.append(np.mean(self.episode_rewards))
-
             if len(self.episode_rewards) > 10:
                 reward_diff = np.abs(self.episode_rewards[-1] - np.mean(self.episode_rewards[-10:]))
                 if reward_diff < 1e-3 and stable_episode is None:
                     stable_episode = episode
-
             if (episode + 1) % self.save_q_every == 0:
                 if self.state_space_config == "step":
                     self.q_table_snapshots.append(self.q_table.copy())
@@ -149,26 +244,13 @@ class QLearningTSP:
                     sampled_q_table = {state: q.copy() for state, q in sampled_states}
                     self.q_table_snapshots.append(sampled_q_table)
                 self.save_q_table(episode)
-
-            if episode % 100 == 0:  # Record frequencies every 100 steps
+            if episode % 100 == 0:
                 frequencies = [count / (episode + 1) for count in self.action_counts.values()]
                 self.action_frequencies.append(frequencies)
                 strategy_matrix = self.get_strategy_matrix()
                 self.iteration_strategies.append(strategy_matrix)
 
-        print(f"Training converged at episode: {stable_episode}")
-
-    def save_q_table(self, episode):
-        os.makedirs("q_tables", exist_ok=True)
-        if self.state_space_config == "step":
-            file_path = f"q_tables/q_table_simple_{episode + 1}.npy"
-            np.save(file_path, self.q_table)
-        elif self.state_space_config == "visits":
-            # 保存为字典形式
-            file_path = f"q_tables/q_table_path_{episode + 1}.npy"
-            # 由于 defaultdict 不能直接保存，需要转换为普通字典
-            q_table_dict = {state: q for state, q in self.q_table.items()}
-            np.save(file_path, q_table_dict)
+        log.info(f"Training converged at episode: {stable_episode}")
 
     def save_results(self):
         os.makedirs("results", exist_ok=True)
@@ -274,12 +356,6 @@ class QLearningTSP:
             plt.show()
 
     def get_policy(self):
-        """
-        Extract the policy from the Q-table.
-
-        Returns:
-        - policy: Dictionary mapping states to the best action.
-        """
         policy = {}
         if self.state_space_config == "step":
             for state in self.states:
@@ -306,24 +382,15 @@ class QLearningTSP:
         plt.tight_layout()
         plt.show()
 
-if __name__ == "__main__":
-    num_cities = 3
-    state_type = "step"
-    state_type = "visits"
-    cities = np.random.randint(10, 100, size=(num_cities, num_cities))
-    # alpha = 0.1, gamma = 0.9, epsilon = 0.2
-    tsp_solver_detailed = QLearningTSP(cities, state_space_config=state_type, episodes=800, save_q_every=50)
-    tsp_solver_detailed.train()
-    tsp_solver_detailed.plot_stategy()
-    # tsp_solver_detailed.save_results()
-    # tsp_solver_detailed.plot_results()
-    # tsp_solver_detailed.plot_q_value_changes()
-    # tsp_solver_detailed.plot_policy_evolution()
-    # tsp_solver_detailed.plot_action_frequencies()
-    # tsp_solver_detailed.plot_q_value_trends()
+要求把QLearningTSP的严格代码适配进QLearningAgent中，要求不省略功能，特别是区分state创建q-table的逻辑 要求保留QLearningTS中的两种情况。
+QLearningAgent里面有专门计算reward的功能，不需要使用QLearningTSP的-self.cities[self._get_current_city(visited)][action]来获取reward：
+reward_params = {
+    "distance": next_state['step_distance'],  # Distance for the current step
+    "done": done,
+    "total_distance": next_state['total_distance'],
+    "visited": next_state['current_path'],
+    "env": env
+}
+reward = self.adjust_reward(reward_params)
 
-
-# todo list
-# 1.grid search最优参数
-# 2.动态配置reward
-# 3.运行数据
+最后给出QLearningAgent的完整代码即可，不需要BaseAgent

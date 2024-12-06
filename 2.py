@@ -1,9 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+from itertools import product
 import os
 from collections import defaultdict
 import itertools
+from tqdm import tqdm
+from utils.logger import Logger
+
+
 class QLearningTSP:
     def __init__(self, cities, state_space_config="step", alpha=0.1, gamma=0.9, epsilon=0.2,
                  episodes=1000, save_q_every=100):
@@ -47,16 +51,17 @@ class QLearningTSP:
         self.average_rewards = []
         self.cumulative_rewards = []
         self.q_table_snapshots = []
-        self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {state: [] for state in self.states}
+        self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {state: [] for state in
+                                                                                              self.states}
         self.action_frequency = np.zeros((self.num_cities, self.num_cities))
         self.action_frequencies = []
         self.iteration_strategies = []
-        self.action_counts = {a:0 for a in self.states}
+        self.action_counts = {a: 0 for a in self.states}
 
     def update_strategy(self, state, action):
-        key  = tuple([str(i) for i in state])
+        key = tuple([str(i) for i in state])
         if key not in self.strategy_matrix:
-            self.strategy_matrix[key] = {action:0}
+            self.strategy_matrix[key] = {action: 0}
         elif action not in self.strategy_matrix[key]:
             self.strategy_matrix[key][action] = 0
 
@@ -156,7 +161,7 @@ class QLearningTSP:
                 strategy_matrix = self.get_strategy_matrix()
                 self.iteration_strategies.append(strategy_matrix)
 
-        print(f"Training converged at episode: {stable_episode}")
+        log.info(f"Training converged at episode: {stable_episode}")
 
     def save_q_table(self, episode):
         os.makedirs("q_tables", exist_ok=True)
@@ -169,127 +174,6 @@ class QLearningTSP:
             # 由于 defaultdict 不能直接保存，需要转换为普通字典
             q_table_dict = {state: q for state, q in self.q_table.items()}
             np.save(file_path, q_table_dict)
-
-    def save_results(self):
-        os.makedirs("results", exist_ok=True)
-        pd.DataFrame({"Episode": range(1, len(self.episode_rewards) + 1),
-                      "Reward": self.episode_rewards}).to_csv("results/episode_rewards.csv", index=False)
-        pd.DataFrame({"Episode": range(1, len(self.cumulative_rewards) + 1),
-                      "Cumulative Reward": self.cumulative_rewards}).to_csv("results/cumulative_rewards.csv",
-                                                                            index=False)
-        pd.DataFrame({"Episode": range(1, len(self.average_rewards) + 1),
-                      "Average Reward": self.average_rewards}).to_csv("results/average_rewards.csv", index=False)
-
-    def plot_results(self):
-        plt.figure(figsize=(12, 6))
-        plt.plot(range(1, len(self.episode_rewards) + 1), self.episode_rewards, label="Episode Rewards")
-        plt.plot(range(1, len(self.average_rewards) + 1), self.average_rewards, label="Average Rewards")
-        plt.xlabel("Episodes")
-        plt.ylabel("Reward")
-        plt.legend()
-        plt.title("Training Progress")
-        plt.grid(True)
-        plt.show()
-
-    def plot_q_value_changes(self):
-        plt.figure(figsize=(12, 6))
-        if self.state_space_config == "step":
-            for state, q_values in self.q_value_changes.items():
-                plt.plot(q_values, label=f"State {state}")
-        elif self.state_space_config == "visits":
-            # 绘制部分状态的 Q-value 变化
-            sampled_states = list(itertools.islice(self.q_value_changes.items(), 10))  # 采样前10个状态
-            for state, q_values in sampled_states:
-                plt.plot(q_values, label=f"State {state}")
-        plt.xlabel("Updates")
-        plt.ylabel("Q-value")
-        plt.legend()
-        plt.title("Q-value Changes Over Time")
-        plt.show()
-
-    def plot_policy_evolution(self):
-        if not self.q_table_snapshots:
-            print("No Q-table snapshots to plot.")
-            return
-
-        for i, q_table in enumerate(self.q_table_snapshots):
-            plt.figure(figsize=(10, 8))
-            if self.state_space_config == "step":
-                plt.imshow(q_table, cmap='hot', interpolation='nearest')
-                plt.colorbar()
-                plt.title(f"Q-table at Episode {i * self.save_q_every + self.save_q_every}")
-            elif self.state_space_config == "visits":
-                # 对于高维 Q-table，只绘制采样状态
-                sampled_states = list(itertools.islice(q_table.items(), 100))
-                sampled_q = np.array([q for _, q in sampled_states])
-                plt.imshow(sampled_q, cmap='hot', interpolation='nearest')
-                plt.colorbar()
-                plt.title(f"Q-table Snapshot at Episode {i * self.save_q_every + self.save_q_every} (Sampled States)")
-            plt.xlabel("Action")
-            plt.ylabel("State")
-            plt.show()
-
-    def plot_action_frequencies(self):
-        plt.figure(figsize=(10, 8))
-        plt.imshow(self.action_frequency, cmap="hot", interpolation="nearest")
-        plt.colorbar()
-        plt.title("Action Frequency Heatmap")
-        plt.xlabel("Action")
-        plt.ylabel("State")
-        plt.show()
-
-    def plot_q_value_trends(self):
-        if self.state_space_config == "step":
-            x, y = np.meshgrid(range(self.num_cities), range(self.num_cities))
-            q_values = self.q_table
-            fig = plt.figure(figsize=(10, 8))
-            ax = fig.add_subplot(111, projection='3d')
-            ax.plot_surface(x, y, q_values, cmap='viridis')
-            ax.set_title("Q-value Trends")
-            ax.set_xlabel("State")
-            ax.set_ylabel("Action")
-            ax.set_zlabel("Q-value")
-            plt.show()
-        elif self.state_space_config == "visits":
-            # 聚合 Q-values 进行可视化
-            # 示例：对采样状态的 Q-values 取平均
-            sampled_q_tables = self.q_table_snapshots
-            if not sampled_q_tables:
-                print("No Q-table snapshots available for plotting.")
-                return
-            # 取最后一个快照
-            last_snapshot = sampled_q_tables[-1]
-            # 按动作聚合 Q-values
-            aggregate_q = np.zeros(self.num_cities)
-            count = 0
-            for q_values in last_snapshot.values():
-                aggregate_q += q_values
-                count += 1
-            aggregate_q /= count if count > 0 else 1
-            plt.figure(figsize=(10, 6))
-            plt.bar(range(self.num_cities), aggregate_q, color='skyblue')
-            plt.xlabel("Action")
-            plt.ylabel("Average Q-value")
-            plt.title("Average Q-value per Action (Aggregated)")
-            plt.show()
-
-    def get_policy(self):
-        """
-        Extract the policy from the Q-table.
-
-        Returns:
-        - policy: Dictionary mapping states to the best action.
-        """
-        policy = {}
-        if self.state_space_config == "step":
-            for state in self.states:
-                best_action = np.argmax(self.q_table[state])
-                policy[state] = best_action
-        elif self.state_space_config == "visits":
-            for state, q_values in self.q_table.items():
-                best_action = np.argmax(q_values)
-                policy[state] = best_action
-        return policy
 
     def plot_stategy(self):
         plt.figure(figsize=(15, 6))
@@ -306,24 +190,75 @@ class QLearningTSP:
         plt.tight_layout()
         plt.show()
 
+
+def grid_search_tsp(cities, state_space_config, param_grid, episodes=800):
+    """
+    对TSP问题的Q-Learning进行网格搜索，找到最优超参数。
+
+    Parameters:
+    - cities: 城市距离矩阵。
+    - state_space_config: 状态空间配置。
+    - param_grid: 参数搜索空间（字典）。
+    - episodes: 每组参数的训练轮数。
+
+    Returns:
+    - best_params: 最优参数组合。
+    - best_reward: 最优参数的平均奖励。
+    - results: 所有参数组合的奖励。
+    """
+    results = []
+    best_params = None
+    best_reward = float('-inf')
+
+    param_combinations = list(product(*param_grid.values()))
+    total_combinations = len(param_combinations)
+    with tqdm(total=total_combinations, desc='参数搜索', unit='comb') as pbar:
+        for params in param_combinations:
+            alpha, gamma, epsilon = params
+            log.info(f"Training with alpha={alpha}, gamma={gamma}, epsilon={epsilon}")
+
+            tsp_solver = QLearningTSP(
+                cities,
+                state_space_config=state_space_config,
+                alpha=alpha,
+                gamma=gamma,
+                epsilon=epsilon,
+                episodes=episodes
+            )
+            tsp_solver.train()
+
+            # 使用最后100轮的平均奖励作为评价指标
+            avg_reward = np.mean(tsp_solver.episode_rewards[-10:])
+            results.append((params, avg_reward))
+
+            if avg_reward > best_reward:
+                best_reward = avg_reward
+                best_params = params
+            pbar.update(1)
+
+    return best_params, best_reward, results
+
+
 if __name__ == "__main__":
-    num_cities = 3
-    state_type = "step"
-    state_type = "visits"
+    log = Logger("grid_search", '1').get_logger()
+    param_grid = {
+        "alpha": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
+        "gamma": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
+        "epsilon": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.1, 0.2, 0.3]
+    } #Best:(0.5, 0.5, 0.05)
+    num_cities = 5
     cities = np.random.randint(10, 100, size=(num_cities, num_cities))
-    # alpha = 0.1, gamma = 0.9, epsilon = 0.2
-    tsp_solver_detailed = QLearningTSP(cities, state_space_config=state_type, episodes=800, save_q_every=50)
-    tsp_solver_detailed.train()
-    tsp_solver_detailed.plot_stategy()
-    # tsp_solver_detailed.save_results()
-    # tsp_solver_detailed.plot_results()
-    # tsp_solver_detailed.plot_q_value_changes()
-    # tsp_solver_detailed.plot_policy_evolution()
-    # tsp_solver_detailed.plot_action_frequencies()
-    # tsp_solver_detailed.plot_q_value_trends()
+    np.fill_diagonal(cities, 0)  # 对角线为0，表示自己到自己距离为0
 
+    best_params, best_reward, results = grid_search_tsp(
+        cities,
+        state_space_config="visits",
+        param_grid=param_grid,
+        episodes=10000
+    )
 
-# todo list
-# 1.grid search最优参数
-# 2.动态配置reward
-# 3.运行数据
+    log.info(f"\nBest Parameters:{best_params}", )
+    log.info(f"Best Average Reward:{best_reward}")
+    log.info("\nAll Results:")
+    for params, reward in results:
+        log.info(f"Params: alpha={params[0]}, gamma={params[1]}, epsilon={params[2]} -> Avg Reward: {reward}")
