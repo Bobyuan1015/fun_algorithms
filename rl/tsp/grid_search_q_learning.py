@@ -86,7 +86,7 @@ class QLearningTSP:
         current_city = self._get_current_city(visited)
         available_actions = [a for a in range(self.num_cities) if a not in visited]
         if np.random.rand() < self.epsilon:
-            log.info(f"_choose_action random   alph={self.alpha} gamma={self.gamma} epsilon={self.epsilon}")
+            # log.info(f"_choose_action random   alph={self.alpha} gamma={self.gamma} epsilon={self.epsilon}")
             return np.random.choice(available_actions)
         else:
             if self.state_space_config == "step":
@@ -121,7 +121,7 @@ class QLearningTSP:
     def train(self):
         stable_episode = None
         for episode in range(self.episodes):
-            start_city = 0
+            start_city = 0# np.random.choice(self.states)
             visited = [start_city]
             episode_reward = 0
 
@@ -135,7 +135,7 @@ class QLearningTSP:
                 self.action_frequency[self._get_current_city(visited)][action] += 1
                 self.update_strategy(visited, action)
                 visited = next_visited
-            print(f'episode={episode}  visited={visited}')
+
             self.episode_rewards.append(episode_reward)
             self.cumulative_rewards.append(sum(self.episode_rewards))
             self.average_rewards.append(np.mean(self.episode_rewards))
@@ -144,7 +144,6 @@ class QLearningTSP:
                 reward_diff = np.abs(self.episode_rewards[-1] - np.mean(self.episode_rewards[-10:]))
                 if reward_diff < 1e-3 and stable_episode is None:
                     stable_episode = episode
-                    return
 
             if (episode + 1) % self.save_q_every == 0:
                 if self.state_space_config == "step":
@@ -231,7 +230,7 @@ def grid_search_tsp(cities, state_space_config, param_grid, episodes=800, max_wo
 
     # 使用并行执行
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(run_single_config, cities, state_space_config, episodes, params): params 
+        futures = {executor.submit(run_single_config, cities, state_space_config, episodes, params): params
                    for params in param_combinations}
 
         # 使用tqdm显示进度
@@ -249,16 +248,11 @@ def grid_search_tsp(cities, state_space_config, param_grid, episodes=800, max_wo
 
 if __name__ == "__main__":
     log = Logger("grid_search", '1').get_logger()
-    # param_grid = {
-    #     "alpha": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
-    #     "gamma": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
-    #     "epsilon": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.1, 0.2, 0.3]
-    # } # Best:(0.95, 0.05, 0)
     param_grid = {
-        "alpha": [0.95],
-        "gamma": [ 0.05],
-        "epsilon": [0]
-    }  # Best:(0.95, 0.05, 0)
+        "alpha": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
+        "gamma": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
+        "epsilon": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.1, 0.2, 0.3]
+    } # Best:(0.5, 0.5, 0.05)
     num_cities = 5
     env = TSPEnv(num_cities=5)
     cities_ = np.random.randint(10, 100, size=(num_cities, num_cities))
@@ -268,7 +262,7 @@ if __name__ == "__main__":
         cities,
         state_space_config="visits",
         param_grid=param_grid,
-        episodes=10000,
+        episodes=5000,
         max_workers=8  # 根据CPU核数调整此参数
     )
 
