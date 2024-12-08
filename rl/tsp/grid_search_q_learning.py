@@ -152,7 +152,7 @@ class QLearningTSP:
                     sampled_states = list(itertools.islice(self.q_table.items(), 100))
                     sampled_q_table = {state: q.copy() for state, q in sampled_states}
                     self.q_table_snapshots.append(sampled_q_table)
-                self.save_q_table(episode)
+                # self.save_q_table(episode)
 
             if episode % 100 == 0:  # Record frequencies every 100 steps
                 frequencies = [count / (episode + 1) for count in self.action_counts.values()]
