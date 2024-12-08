@@ -76,7 +76,7 @@ class BaseAgent(ABC):
         """
         if use_sample and random.uniform(0, 1) < self.epsilon:
             # Explore: select a random action
-            return random.randint(0, self.num_actions - 1)
+            return random.choice(state['unvisited_cities'])
         else:
             # Exploit: select the greedy action
             return self.get_greedy_action(state)

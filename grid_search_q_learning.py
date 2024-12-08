@@ -5,10 +5,8 @@ import os
 from collections import defaultdict
 import itertools
 from tqdm import tqdm
-
-from rl.env.tsp_env import TSPEnv
 from utils.logger import Logger
-from concurrent.futures import ProcessPoolExecutor, as_completed
+
 
 class QLearningTSP:
     def __init__(self, cities, state_space_config="step", alpha=0.1, gamma=0.9, epsilon=0.2,
@@ -38,20 +36,23 @@ class QLearningTSP:
         self.states = list(range(self.num_cities))
 
         if self.state_space_config == "step":
+            # Simple state: current city
             self.q_table = np.zeros((self.num_cities, self.num_cities))
             self.strategy_matrix = np.zeros((self.num_cities, self.num_cities))
         elif self.state_space_config == "visits":
+            # Detailed state: visited cities as a tuple
             self.q_table = defaultdict(lambda: np.zeros(self.num_cities))
             self.strategy_matrix = dict()
         else:
-            raise ValueError("Invalid state_space_config. Choose 'step' or 'visits'.")
+            raise ValueError("Invalid state_space_config. Choose 'simple' or 'path'.")
 
         # Data recording
         self.episode_rewards = []
         self.average_rewards = []
         self.cumulative_rewards = []
         self.q_table_snapshots = []
-        self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {state: [] for state in self.states}
+        self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {state: [] for state in
+                                                                                              self.states}
         self.action_frequency = np.zeros((self.num_cities, self.num_cities))
         self.action_frequencies = []
         self.iteration_strategies = []
@@ -63,6 +64,7 @@ class QLearningTSP:
             self.strategy_matrix[key] = {action: 0}
         elif action not in self.strategy_matrix[key]:
             self.strategy_matrix[key][action] = 0
+
         self.strategy_matrix[key][action] += 1
 
     def get_strategy_matrix(self):
@@ -86,7 +88,6 @@ class QLearningTSP:
         current_city = self._get_current_city(visited)
         available_actions = [a for a in range(self.num_cities) if a not in visited]
         if np.random.rand() < self.epsilon:
-            log.info(f"_choose_action random   alph={self.alpha} gamma={self.gamma} epsilon={self.epsilon}")
             return np.random.choice(available_actions)
         else:
             if self.state_space_config == "step":
@@ -149,7 +150,7 @@ class QLearningTSP:
                 if self.state_space_config == "step":
                     self.q_table_snapshots.append(self.q_table.copy())
                 elif self.state_space_config == "visits":
-                    sampled_states = list(itertools.islice(self.q_table.items(), 100))
+                    sampled_states = list(itertools.islice(self.q_table.items(), 100))  # 采样前100个状态
                     sampled_q_table = {state: q.copy() for state, q in sampled_states}
                     self.q_table_snapshots.append(sampled_q_table)
                 self.save_q_table(episode)
@@ -160,7 +161,7 @@ class QLearningTSP:
                 strategy_matrix = self.get_strategy_matrix()
                 self.iteration_strategies.append(strategy_matrix)
 
-        log.info(f"Training converged at episode: {stable_episode} alph={self.alpha} gamma={self.gamma} epsilon={self.epsilon}")
+        log.info(f"Training converged at episode: {stable_episode}")
 
     def save_q_table(self, episode):
         os.makedirs("q_tables", exist_ok=True)
@@ -168,7 +169,9 @@ class QLearningTSP:
             file_path = f"q_tables/q_table_simple_{episode + 1}.npy"
             np.save(file_path, self.q_table)
         elif self.state_space_config == "visits":
+            # 保存为字典形式
             file_path = f"q_tables/q_table_path_{episode + 1}.npy"
+            # 由于 defaultdict 不能直接保存，需要转换为普通字典
             q_table_dict = {state: q for state, q in self.q_table.items()}
             np.save(file_path, q_table_dict)
 
@@ -188,34 +191,15 @@ class QLearningTSP:
         plt.show()
 
 
-def run_single_config(cities, state_space_config, episodes, params):
+def grid_search_tsp(cities, state_space_config, param_grid, episodes=800):
     """
-    在单独的进程中运行Q-Learning TSP训练并返回结果。
-    """
-    alpha, gamma, epsilon = params
-    tsp_solver = QLearningTSP(
-        cities,
-        state_space_config=state_space_config,
-        alpha=alpha,
-        gamma=gamma,
-        epsilon=epsilon,
-        episodes=episodes
-    )
-    tsp_solver.train()
-    avg_reward = np.mean(tsp_solver.episode_rewards[-10:])
-    return params, avg_reward
-
-
-def grid_search_tsp(cities, state_space_config, param_grid, episodes=800, max_workers=4):
-    """
-    对TSP问题的Q-Learning进行网格搜索，找到最优超参数（使用多进程并行加速）。
+    对TSP问题的Q-Learning进行网格搜索，找到最优超参数。
 
     Parameters:
     - cities: 城市距离矩阵。
     - state_space_config: 状态空间配置。
     - param_grid: 参数搜索空间（字典）。
     - episodes: 每组参数的训练轮数。
-    - max_workers: 最大进程数。
 
     Returns:
     - best_params: 最优参数组合。
@@ -227,21 +211,30 @@ def grid_search_tsp(cities, state_space_config, param_grid, episodes=800, max_wo
     best_reward = float('-inf')
 
     param_combinations = list(product(*param_grid.values()))
+    total_combinations = len(param_combinations)
+    with tqdm(total=total_combinations, desc='参数搜索', unit='comb') as pbar:
+        for params in param_combinations:
+            alpha, gamma, epsilon = params
+            log.info(f"Training with alpha={alpha}, gamma={gamma}, epsilon={epsilon}")
 
-    # 使用并行执行
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(run_single_config, cities, state_space_config, episodes, params): params 
-                   for params in param_combinations}
+            tsp_solver = QLearningTSP(
+                cities,
+                state_space_config=state_space_config,
+                alpha=alpha,
+                gamma=gamma,
+                epsilon=epsilon,
+                episodes=episodes
+            )
+            tsp_solver.train()
 
-        # 使用tqdm显示进度
-        with tqdm(total=len(param_combinations), desc='参数搜索', unit='comb') as pbar:
-            for future in as_completed(futures):
-                params, avg_reward = future.result()
-                results.append((params, avg_reward))
-                if avg_reward > best_reward:
-                    best_reward = avg_reward
-                    best_params = params
-                pbar.update(1)
+            # 使用最后100轮的平均奖励作为评价指标
+            avg_reward = np.mean(tsp_solver.episode_rewards[-10:])
+            results.append((params, avg_reward))
+
+            if avg_reward > best_reward:
+                best_reward = avg_reward
+                best_params = params
+            pbar.update(1)
 
     return best_params, best_reward, results
 
@@ -252,21 +245,19 @@ if __name__ == "__main__":
         "alpha": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
         "gamma": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
         "epsilon": [0, 0.05, 0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.1, 0.2, 0.3]
-    } # Best:(0.5, 0.5, 0.05)
+    } #Best:(0.5, 0.5, 0.05)
     num_cities = 5
-    env = TSPEnv(num_cities=5)
-    cities_ = np.random.randint(10, 100, size=(num_cities, num_cities))
-    np.fill_diagonal(cities_, 0)  # 对角线为0，表示自己到自己距离为0
-    cities = env.distance_matrix
+    cities = np.random.randint(10, 100, size=(num_cities, num_cities))
+    np.fill_diagonal(cities, 0)  # 对角线为0，表示自己到自己距离为0
+
     best_params, best_reward, results = grid_search_tsp(
         cities,
         state_space_config="visits",
         param_grid=param_grid,
-        episodes=10000,
-        max_workers=8  # 根据CPU核数调整此参数
+        episodes=10000
     )
 
-    log.info(f"\nBest Parameters:{list(param_grid.keys())}:{best_params}")
+    log.info(f"\nBest Parameters:{best_params}", )
     log.info(f"Best Average Reward:{best_reward}")
     log.info("\nAll Results:")
     for params, reward in results:

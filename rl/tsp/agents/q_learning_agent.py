@@ -21,6 +21,7 @@ class QLearningAgent(BaseAgent):
                  state_space_config="step",
                  episodes=1000,
                  save_q_every=100 ):
+        # Best Parameters:(alpha=0.7, gamma=0.1, epsilon=0)
 
         self.num_cities = num_cities
         self.num_actions = num_actions
@@ -148,6 +149,23 @@ class QLearningAgent(BaseAgent):
             q_values = self.q_table.get(visited_tuple, np.zeros(self.num_actions))
             return np.argmax(q_values)
 
+    def get_greedy_action(self, state):
+        # Greedy action depends on state representation
+        if self.state_space_config == "step":
+            current_city = self.state_to_index(state)
+            q_values = self.q_table[current_city]
+        elif self.state_space_config == "visits":
+            visited_tuple = self.state_to_index(state)
+            q_values = self.q_table.get(visited_tuple, np.zeros(self.num_actions))
+
+        # Filter q_values to only consider unvisited cities
+        unvisited_cities = state['unvisited_cities']
+        unvisited_q_values = {city: q_values[city] for city in unvisited_cities}
+
+        # Select the action with the highest Q-value among unvisited cities
+        greedy_action = max(unvisited_q_values, key=unvisited_q_values.get)
+        return greedy_action
+
     def state_to_index(self, state):
         # "step": state['current_city']
         # "visits": tuple of visited path
@@ -158,6 +176,8 @@ class QLearningAgent(BaseAgent):
 
     def update_strategy(self, state, action):
         # Update strategy_matrix
+        if state['current_city'] == action:
+            print(f'----------- a=s={action}')
         if self.state_space_config == "step":
             current_city = state['current_city']
             self.strategy_matrix[current_city][action] += 1
@@ -215,7 +235,7 @@ class QLearningAgent(BaseAgent):
     def train(self, env, num_episodes):
         stable_episode = None
         for episode in range(num_episodes):
-            state = env.reset()
+            state = env.reset(fix_start=True)
             # For "step" config: state is simple (current_city)
             # For "visits" config: state includes visited path in state['current_path']
             total_distance = float('inf')  # start as inf
@@ -223,7 +243,7 @@ class QLearningAgent(BaseAgent):
             done = False
 
             while not done:
-                action = self.choose_action(state)
+                action = self.choose_action(state) # learn available ACTION by q table, instead of rule_based force
                 self.action_counts[action] += 1
 
                 next_state, base_reward, done = env.step(action)
@@ -252,7 +272,7 @@ class QLearningAgent(BaseAgent):
 
                 state = next_state
                 total_distance = next_state['total_distance']
-
+                print(f'episode=episode{episode}    total_distance={total_distance}')
             # Episode ended
             self.episode_rewards.append(episode_reward)
             self.cumulative_rewards.append(sum(self.episode_rewards))
