@@ -2,7 +2,14 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import pandas as pd
 import random
+from datetime import datetime
+from confs.path_conf import system_experience_dir
 from rl.tsp.common.reward_policy import adjust_reward
+
+import pickle
+from confs.path_conf import tsp_agents_data_dir
+from rl.tsp.agents.agent import BaseAgent
+from rl.tsp.agents.agent import BaseAgent对应源码如下：
 class BaseAgent(ABC):
     def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.1,
                  reward_strategy="negative_distance", model_path=None):
@@ -46,12 +53,15 @@ class BaseAgent(ABC):
     def adjust_reward(self, reward_params):
         return adjust_reward(reward_params, self.reward_strategy, self.history_best_distance)
 
-import pickle
-from confs.path_conf import tsp_agents_data_dir
-from rl.tsp.agents.agent import BaseAgent
+
 class QLearningAgent(BaseAgent):
     def __init__(self, num_cities, num_actions, alpha=0.1, gamma=0.99, epsilon=0.5,
                  reward_strategy="negative_distance", model_path=tsp_agents_data_dir + "best_q-table.pkl"):
+        date_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.base_dir = f'{system_experience_dir}/{date_string}/'
+        os.makedirs(self.base_dir , exist_ok=True)
+
+        self.model_path = self.base_dir  +'model_QLearningAgent.pkl'
         super().__init__(num_cities, num_actions, alpha, gamma, epsilon, reward_strategy, model_path)
     def initialize_model(self):
         self.q_table = np.zeros((self.num_cities, self.num_actions))  # Initialize Q-table
@@ -129,7 +139,7 @@ import os
 from collections import defaultdict
 import itertools
 from utils.logger import Logger
-log = Logger("reward", '1').get_logger()
+log = Logger("grid_search_q_learning", '1').get_logger()
 class QLearningTSP:
     def __init__(self, cities, state_space_config="step", alpha=0.1, gamma=0.9, epsilon=0.2,
                  episodes=1000, save_q_every=100):
@@ -382,8 +392,10 @@ class QLearningTSP:
         plt.tight_layout()
         plt.show()
 
+你是一个python写深度学习、强化学习的高手
 要求把QLearningTSP的严格代码适配进QLearningAgent中，要求不省略功能，特别是区分state创建q-table的逻辑 要求保留QLearningTS中的两种情况。
-QLearningAgent里面有专门计算reward的功能，不需要使用QLearningTSP的-self.cities[self._get_current_city(visited)][action]来获取reward：
+QLearningAgent里面特性：
+1.有专门计算reward的功能，不需要使用QLearningTSP的-self.cities[self._get_current_city(visited)][action]来获取reward：
 reward_params = {
     "distance": next_state['step_distance'],  # Distance for the current step
     "done": done,
@@ -392,5 +404,10 @@ reward_params = {
     "env": env
 }
 reward = self.adjust_reward(reward_params)
+2.模型保存成pkl的后缀，所以类变量不能使用lambda初始化，比如defaultdict(lambda: defaultdict(int))类似这种；保存模型需要增加state_space_config，对应加载模型的时候需要匹配state_space_config。
+3.QLearningAgent要求适配所有QLearningTSP的plot函数，绘图的时候图保存到self.base_dir目录的下（不要嵌套result子文件夹），并且要求单独绘制图(不要多张图放到一起)。保存后，show图。另外绘图的时候，颜色不要使用黑色，可以参照yolov5绘图选择的颜色
+4.适配QLearningTSP的strategy_matrix，在train过程中赋值 和plot_strategy 绘制 要求不报错，特别是key、value的值要兼容, 容易出错函数plot_strategy，update_strategy函数；
+5.要对应save_results函数
+4.train函数中total_distance = float('inf') 为初始值 而不是0
 
-最后给出QLearningAgent的完整代码即可，不需要BaseAgent
+最后只需要给出QLearningAgent的完整代码即可，不需要BaseAgent，但是要from rl.tsp.agents.agent import BaseAgent

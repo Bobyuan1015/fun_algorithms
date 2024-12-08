@@ -1,4 +1,3 @@
-# 设置环境和训练参数
 from rl.env.tsp_env import TSPEnv
 from rl.tsp.agents.actor_critic_agent import ActorCriticAgent
 from rl.tsp.agents.dqn_agent import DQNAgent
@@ -18,22 +17,22 @@ def evaluate(agent):
         env.render(disappear=True)
 
 if __name__ == '__main__':
-    num_cities = 10
+    num_cities = 5
     num_actions = num_cities
-    num_episodes = 1000
+    num_episodes = 2000
 
     env = TSPEnv(num_cities=num_cities)
-    agent = QLearningAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
+    agent = QLearningAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance", state_space_config='visits')
     # agent = DQNAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
     # agent = ActorCriticAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
     # agent = PPOAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
 
     agent.train(env, num_episodes)
     # evaluate(agent)
-    agent.plot_stategy()
-    # agent.save_results()
-    # agent.plot_results()
-    # agent.plot_q_value_changes()
-    # agent.plot_policy_evolution()
-    # agent.plot_action_frequencies()
-    # agent.plot_q_value_trends()
+    agent.plot_strategy()
+    agent.save_results()
+    agent.plot_results()
+    agent.plot_q_value_changes()
+    agent.plot_policy_evolution()
+    agent.plot_action_frequencies()
+    agent.plot_q_value_trends()
