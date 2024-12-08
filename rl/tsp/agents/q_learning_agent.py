@@ -305,8 +305,13 @@ class QLearningAgent(BaseAgent):
                 self.action_frequencies.append(frequencies)
                 # track iteration strategies
                 strategy_matrix = self.get_strategy_matrix()
-                self.iteration_strategies.append(strategy_matrix)
+                self.iteration_strategies.append([episode,strategy_matrix])
                 self.save_model()
+                # Reset action counts and strategy matrix at the start of the episode
+                self.action_counts = {a: 0 for a in range(self.num_actions)}  # Reset counts for the new episode
+                self.strategy_matrix = np.zeros(
+                    (self.num_cities, self.num_actions)) if self.state_space_config == "step" else {}
+                self.action_frequency = np.zeros((self.num_cities, self.num_actions))  # Reset action frequency
 
         print(f"Training converged at episode: {stable_episode}")
 
@@ -444,8 +449,8 @@ class QLearningAgent(BaseAgent):
         # Each entry in iteration_strategies is a matrix
         for i, strategy in enumerate(self.iteration_strategies):
             plt.figure(figsize=(8, 6))
-            plt.imshow(strategy, cmap='viridis', interpolation='nearest')
-            plt.title(f'Strategy at Iteration {i * 100}')
+            plt.imshow(strategy[1], cmap='viridis', interpolation='nearest')
+            plt.title(f'Strategy at episode {strategy[0]}')
             plt.xticks(ticks=np.arange(self.num_actions), labels=np.arange(self.num_actions))
             plt.yticks(ticks=np.arange(self.num_cities), labels=np.arange(self.num_cities))
             plt.xlabel('Destination City (Action)')

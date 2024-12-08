@@ -19,7 +19,7 @@ def evaluate(agent):
 if __name__ == '__main__':
     num_cities = 5
     num_actions = num_cities
-    num_episodes = 2000
+    num_episodes = 200
 
     env = TSPEnv(num_cities=num_cities)
     agent = QLearningAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance", state_space_config='visits')
