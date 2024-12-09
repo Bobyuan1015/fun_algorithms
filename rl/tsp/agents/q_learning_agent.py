@@ -4,6 +4,9 @@ import pickle
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib import cm
+import matplotlib.colors as mcolors
 import pandas as pd
 from collections import defaultdict
 import itertools
@@ -49,7 +52,6 @@ class QLearningAgent(BaseAgent):
         self.action_counts = {a: 0 for a in range(self.num_actions)}
         self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {s: [] for s in
                                                                                               range(self.num_cities)}
-
         # strategy_matrix initialization
         # For "step" state space: matrix shape = (num_cities, num_actions)
         # For "visits" state space: dictionary with {state (tuple): {action: count}}
@@ -326,7 +328,7 @@ class QLearningAgent(BaseAgent):
                       "Average Reward": self.average_rewards}).to_csv(self.base_dir + "average_rewards.csv",
                                                                       index=False)
 
-    def plot_results(self):
+    def plot_results(self,show=False):
         plt.figure(figsize=(12, 6))
         plt.plot(range(1, len(self.episode_rewards) + 1), self.episode_rewards, label="Episode Rewards")
         plt.plot(range(1, len(self.average_rewards) + 1), self.average_rewards, label="Average Rewards")
@@ -336,9 +338,10 @@ class QLearningAgent(BaseAgent):
         plt.title("Training Progress")
         plt.grid(True)
         plt.savefig(self.base_dir + "training_progress.png")
-        plt.show()
+        if show:
+            plt.show()
 
-    def plot_q_value_changes(self):
+    def plot_q_value_changes(self,show=False):
         plt.figure(figsize=(12, 6))
         # Use a color map that isn't black
         # For visits, sample a few states; for step, plot all
@@ -348,7 +351,7 @@ class QLearningAgent(BaseAgent):
                     plt.plot(q_values, label=f"State {state}")
         elif self.state_space_config == "visits":
             # Sample a few states
-            sampled_states = list(itertools.islice(self.q_value_changes.items(), 10))
+            sampled_states = list(itertools.islice(self.q_value_changes.items(), 10)) #random pick todo
             for state, q_values in sampled_states:
                 if len(q_values) > 0:
                     plt.plot(q_values, label=f"State {state}")
@@ -358,9 +361,10 @@ class QLearningAgent(BaseAgent):
         plt.title("Q-value Changes Over Time")
         plt.grid(True)
         plt.savefig(self.base_dir + "q_value_changes.png")
-        plt.show()
+        if show:
+            plt.show()
 
-    def plot_policy_evolution(self):
+    def plot_policy_evolution(self,show=False):
         if not self.q_table_snapshots:
             print("No Q-table snapshots to plot.")
             return
@@ -384,9 +388,10 @@ class QLearningAgent(BaseAgent):
                 plt.xlabel("Action")
                 plt.ylabel("Sampled State Index")
             plt.savefig(self.base_dir + f"q_table_snapshot_{i + 1}.png")
-            plt.show()
+            if show:
+                plt.show()
 
-    def plot_action_frequencies(self):
+    def plot_action_frequencies(self,show=False):
         plt.figure(figsize=(10, 8))
         plt.imshow(self.action_frequency, cmap="viridis", interpolation="nearest")
         plt.colorbar()
@@ -394,9 +399,11 @@ class QLearningAgent(BaseAgent):
         plt.xlabel("Action")
         plt.ylabel("State")
         plt.savefig(self.base_dir + "action_frequency_heatmap.png")
-        plt.show()
+        if show:
+            plt.show()
 
-    def plot_q_value_trends(self):
+
+    def plot_q_value_trends(self, show=False):
         if self.state_space_config == "step":
             x, y = np.meshgrid(range(self.num_actions), range(self.num_cities))
             q_values = self.q_table
@@ -408,29 +415,79 @@ class QLearningAgent(BaseAgent):
             ax.set_ylabel("State")
             ax.set_zlabel("Q-value")
             plt.savefig(self.base_dir + "q_value_trends.png")
-            plt.show()
+            if show:
+                plt.show()
+
         elif self.state_space_config == "visits":
-            # Aggregate Q-values for visits scenario
+            # Ensure there are Q-table snapshots
             if not self.q_table_snapshots:
                 print("No Q-table snapshots available for plotting Q-value trends.")
                 return
-            # Take last snapshot
-            last_snapshot = self.q_table_snapshots[-1]
-            # Aggregate Q-values
-            aggregate_q = np.zeros(self.num_actions)
-            count = 0
-            for q_values in last_snapshot.values():
-                aggregate_q += q_values
-                count += 1
-            if count > 0:
-                aggregate_q /= count
-            plt.figure(figsize=(10, 6))
-            plt.bar(range(self.num_actions), aggregate_q, color='skyblue')
-            plt.xlabel("Action")
-            plt.ylabel("Average Q-value")
-            plt.title("Average Q-value per Action (Aggregated)")
-            plt.savefig(self.base_dir + "q_value_trends_aggregated.png")
-            plt.show()
+
+            # Dictionary to store (state, action) pairs and their corresponding q-values over snapshots
+            state_action_trends = {}
+
+            # Iterate over all snapshots
+            for snapshot_idx, snapshot in enumerate(self.q_table_snapshots):
+                for state, q_values in snapshot.items():
+                    # For each (state, action) pair, store the q-value and snapshot index
+                    for action_idx, q_value in enumerate(q_values):
+                        state_action_key = (state, action_idx)
+
+                        # Initialize the list of Q-values if not already present
+                        if state_action_key not in state_action_trends:
+                            state_action_trends[state_action_key] = []
+
+                        # Append the Q-value for the current snapshot
+                        state_action_trends[state_action_key].append(q_value)
+
+            # Group (state, action) pairs by the length of state
+            grouped_by_state_length = {}
+            for state_action_key, q_values in state_action_trends.items():
+                state, action = state_action_key
+                state_len = len(state)  # Group by length of state
+
+                if state_len not in grouped_by_state_length:
+                    grouped_by_state_length[state_len] = []
+
+                grouped_by_state_length[state_len].append((state_action_key, q_values))
+
+            # Define a distinct color palette for different groups of states
+            total_states = len(state_action_trends)
+            base_colors = sns.color_palette("Set1", total_states)  # A color palette with distinct colors for each group
+
+            # Plot for each group of states with the same length
+            for state_len, group in grouped_by_state_length.items():
+                plt.figure(figsize=(12, 8))
+
+                # Ensure that for each state group, action curves use a color gradient from dark to light
+                for idx, (state_action_key, q_values) in enumerate(group):
+                    state, action = state_action_key
+                    num_actions = len(q_values)
+
+                    # Generate a color gradient from dark to light for the actions
+                    base_color = base_colors[idx % len(base_colors)]  # Pick base color for the current group
+
+                    # Generate a colormap for the actions based on the number of actions
+                    action_colors = [mcolors.to_rgba(base_color, alpha=1 - (i / num_actions)) for i in
+                                     range(num_actions)]
+
+                    # Plot each action's Q-value trend using a different color in the gradient
+                    plt.plot(range(len(q_values)), q_values, label=f"State: {state}, Action: {action}",
+                             color=action_colors[action])
+
+                # Customize plot
+                plt.xlabel("Iteration (Snapshot Index)")
+                plt.ylabel("Q-value")
+                plt.title(f"Q-value Trends for State Length {state_len} (State, Action) Pairs Across Snapshots")
+                plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
+
+                # Save the plot for this group
+                plt.savefig(self.base_dir + f"q_value_trends_state_len_{state_len}.png", bbox_inches='tight')
+
+                # Show the plot if required
+                if show:
+                    plt.show()
 
     def get_policy(self):
         policy = {}
@@ -444,7 +501,7 @@ class QLearningAgent(BaseAgent):
                 policy[state] = best_action
         return policy
 
-    def plot_strategy(self):
+    def plot_strategy(self,show=False):
         # Plot each strategy_matrix in iteration_strategies
         # Each entry in iteration_strategies is a matrix
         for i, strategy in enumerate(self.iteration_strategies):
@@ -456,7 +513,8 @@ class QLearningAgent(BaseAgent):
             plt.xlabel('Destination City (Action)')
             plt.ylabel('Current City (State)')
             plt.colorbar()
-            plt.savefig(self.base_dir + f"strategy_iteration_{i * 100}.png")
-            plt.show()
+            plt.savefig(self.base_dir + f"strategy_episode{strategy[0]}.png")
+            if show:
+                plt.show()
 
 
