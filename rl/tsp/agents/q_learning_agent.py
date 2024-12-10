@@ -1,4 +1,4 @@
-
+import copy
 import os
 import pickle
 from datetime import datetime
@@ -23,7 +23,7 @@ class QLearningAgent(BaseAgent):
                  reward_strategy="negative_distance",
                  state_space_config="step",
                  episodes=1000,
-                 save_q_every=100 ):
+                 save_q_every=10 ):
         # Best Parameters:(alpha=0.7, gamma=0.1, epsilon=0)
 
         self.num_cities = num_cities
@@ -47,9 +47,9 @@ class QLearningAgent(BaseAgent):
         self.average_rewards = []
         self.cumulative_rewards = []
         self.q_table_snapshots = []
-        self.action_frequencies = []
         self.iteration_strategies = []
-        self.action_counts = {a: 0 for a in range(self.num_actions)}
+        self.iteration_action_frequencies = []
+
         self.q_value_changes = defaultdict(list) if self.state_space_config == "visits" else {s: [] for s in
                                                                                               range(self.num_cities)}
         # strategy_matrix initialization
@@ -96,9 +96,8 @@ class QLearningAgent(BaseAgent):
                     self.average_rewards = saved_data.get("average_rewards", [])
                     self.cumulative_rewards = saved_data.get("cumulative_rewards", [])
                     self.q_table_snapshots = saved_data.get("q_table_snapshots", [])
-                    self.action_frequencies = saved_data.get("action_frequencies", [])
                     self.iteration_strategies = saved_data.get("iteration_strategies", [])
-                    self.action_counts = saved_data.get("action_counts", {a: 0 for a in range(self.num_actions)})
+                    self.iteration_action_frequencies = saved_data.get("iteration_action_frequencies", [])
                     self.q_value_changes = saved_data.get("q_value_changes",
                                                           defaultdict(list) if self.state_space_config == "visits" else {s: [] for s in range(self.num_cities)})
                     self.strategy_matrix = saved_data.get("strategy_matrix",
@@ -127,9 +126,8 @@ class QLearningAgent(BaseAgent):
             "average_rewards": self.average_rewards,
             "cumulative_rewards": self.cumulative_rewards,
             "q_table_snapshots": self.q_table_snapshots,
-            "action_frequencies": self.action_frequencies,
             "iteration_strategies": self.iteration_strategies,
-            "action_counts": self.action_counts,
+            "iteration_action_frequencies": self.iteration_action_frequencies,
             "q_value_changes": self.q_value_changes,
             "strategy_matrix": self.strategy_matrix,
             "action_frequency": self.action_frequency
@@ -246,7 +244,6 @@ class QLearningAgent(BaseAgent):
 
             while not done:
                 action = self.choose_action(state) # learn available ACTION by q table, instead of rule_based force
-                self.action_counts[action] += 1
 
                 next_state, base_reward, done = env.step(action)
                 reward_params = {
@@ -303,14 +300,13 @@ class QLearningAgent(BaseAgent):
                     sampled_q_table = {state: q.copy() for state, q in sampled_states}
                     self.q_table_snapshots.append(sampled_q_table)
                 # track action frequencies
-                frequencies = [count / (episode + 1) for count in self.action_counts.values()]
-                self.action_frequencies.append(frequencies)
                 # track iteration strategies
                 strategy_matrix = self.get_strategy_matrix()
                 self.iteration_strategies.append([episode,strategy_matrix])
+                self.iteration_action_frequencies.append([episode,copy.deepcopy(self.action_frequency)])
                 self.save_model()
                 # Reset action counts and strategy matrix at the start of the episode
-                self.action_counts = {a: 0 for a in range(self.num_actions)}  # Reset counts for the new episode
+                # Reset counts for the new episode
                 self.strategy_matrix = np.zeros(
                     (self.num_cities, self.num_actions)) if self.state_space_config == "step" else {}
                 self.action_frequency = np.zeros((self.num_cities, self.num_actions))  # Reset action frequency
@@ -328,7 +324,7 @@ class QLearningAgent(BaseAgent):
                       "Average Reward": self.average_rewards}).to_csv(self.base_dir + "average_rewards.csv",
                                                                       index=False)
 
-    def plot_results(self,show=False):
+    def plot_results(self, show=False):
         plt.figure(figsize=(12, 6))
         plt.plot(range(1, len(self.episode_rewards) + 1), self.episode_rewards, label="Episode Rewards")
         plt.plot(range(1, len(self.average_rewards) + 1), self.average_rewards, label="Average Rewards")
@@ -340,6 +336,7 @@ class QLearningAgent(BaseAgent):
         plt.savefig(self.base_dir + "training_progress.png")
         if show:
             plt.show()
+        plt.close()
 
     def plot_q_value_changes(self,show=False):
         plt.figure(figsize=(12, 6))
@@ -363,6 +360,7 @@ class QLearningAgent(BaseAgent):
         plt.savefig(self.base_dir + "q_value_changes.png")
         if show:
             plt.show()
+        plt.close()
 
     def plot_policy_evolution(self,show=False):
         if not self.q_table_snapshots:
@@ -390,18 +388,20 @@ class QLearningAgent(BaseAgent):
             plt.savefig(self.base_dir + f"q_table_snapshot_{i + 1}.png")
             if show:
                 plt.show()
+        plt.close()
 
     def plot_action_frequencies(self,show=False):
-        plt.figure(figsize=(10, 8))
-        plt.imshow(self.action_frequency, cmap="viridis", interpolation="nearest")
-        plt.colorbar()
-        plt.title("Action Frequency Heatmap")
-        plt.xlabel("Action")
-        plt.ylabel("State")
-        plt.savefig(self.base_dir + "action_frequency_heatmap.png")
-        if show:
-            plt.show()
-
+        for episode, action_frequency in self.iteration_action_frequencies:
+            plt.figure(figsize=(10, 8))
+            plt.imshow(action_frequency, cmap="viridis", interpolation="nearest")
+            plt.colorbar()
+            plt.title(f"Episode={episode} Action Frequency Heatmap")
+            plt.xlabel("Action")
+            plt.ylabel("State")
+            plt.savefig(self.base_dir + "action_frequency_heatmap.png")
+            if show:
+                plt.show()
+            plt.close()
 
     def plot_q_value_trends(self, show=False):
         if self.state_space_config == "step":
@@ -439,55 +439,62 @@ class QLearningAgent(BaseAgent):
                             state_action_trends[state_action_key] = []
 
                         # Append the Q-value for the current snapshot
-                        state_action_trends[state_action_key].append(q_value)
+                        state_action_trends[state_action_key].append((snapshot_idx, q_value))
 
-            # Group (state, action) pairs by the length of state
-            grouped_by_state_length = {}
+            # Group (state, action) pairs by the state and its length
+            grouped_by_state = {}
             for state_action_key, q_values in state_action_trends.items():
                 state, action = state_action_key
-                state_len = len(state)  # Group by length of state
 
-                if state_len not in grouped_by_state_length:
-                    grouped_by_state_length[state_len] = []
+                if state not in grouped_by_state:
+                    grouped_by_state[state] = []
 
-                grouped_by_state_length[state_len].append((state_action_key, q_values))
+                grouped_by_state[state].append((state_action_key, q_values))
 
-            # Define a distinct color palette for different groups of states
-            total_states = len(state_action_trends)
-            base_colors = sns.color_palette("Set1", total_states)  # A color palette with distinct colors for each group
+            # Prepare to plot trends for each (state, action) group
+            # Generate a distinct color palette for each state group
+            unique_colors = sns.color_palette("husl", len(grouped_by_state))  # Distinct color for each state
+            color_idx = 0  # Keep track of which color to use for each state
 
-            # Plot for each group of states with the same length
-            for state_len, group in grouped_by_state_length.items():
+            # Plot for each group of states
+            for state, group in grouped_by_state.items():
                 plt.figure(figsize=(12, 8))
 
-                # Ensure that for each state group, action curves use a color gradient from dark to light
+                # Select a color palette for the current state group based on its index
+                num_actions = len(group)
+                action_colors = sns.light_palette(unique_colors[color_idx],
+                                                  n_colors=num_actions)  # Gradients for actions
+
+                # Plot each (state, action) trend in the current group
                 for idx, (state_action_key, q_values) in enumerate(group):
                     state, action = state_action_key
-                    num_actions = len(q_values)
+                    color = action_colors[idx]  # Select color for this action within the current state group
 
-                    # Generate a color gradient from dark to light for the actions
-                    base_color = base_colors[idx % len(base_colors)]  # Pick base color for the current group
+                    # Extract snapshot indices and q_values for plotting
+                    snapshot_indices = [x[0] for x in q_values]
+                    q_vals = [x[1] for x in q_values]
 
-                    # Generate a colormap for the actions based on the number of actions
-                    action_colors = [mcolors.to_rgba(base_color, alpha=1 - (i / num_actions)) for i in
-                                     range(num_actions)]
-
-                    # Plot each action's Q-value trend using a different color in the gradient
-                    plt.plot(range(len(q_values)), q_values, label=f"State: {state}, Action: {action}",
-                             color=action_colors[action])
+                    # Plot the trend for this (state, action)
+                    plt.plot(snapshot_indices, q_vals, label=f"State: {state}, Action: {action}", color=color)
 
                 # Customize plot
-                plt.xlabel("Iteration (Snapshot Index)")
+                plt.xlabel("Snapshot Index")
                 plt.ylabel("Q-value")
-                plt.title(f"Q-value Trends for State Length {state_len} (State, Action) Pairs Across Snapshots")
+                plt.title(f"Q-value Trends for State: {state} (State, Action) Pairs Across Snapshots")
                 plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
 
+                # Set the x-axis limits to the full range of snapshot indices
+                plt.xlim(0, len(self.q_table_snapshots) - 1)
+
                 # Save the plot for this group
-                plt.savefig(self.base_dir + f"q_value_trends_state_len_{state_len}.png", bbox_inches='tight')
+                plt.savefig(self.base_dir + f"q_value_trends_state_{state}.png", bbox_inches='tight')
 
                 # Show the plot if required
                 if show:
                     plt.show()
+
+                # Move to the next color for the next state
+                color_idx += 1
 
     def get_policy(self):
         policy = {}
@@ -513,8 +520,7 @@ class QLearningAgent(BaseAgent):
             plt.xlabel('Destination City (Action)')
             plt.ylabel('Current City (State)')
             plt.colorbar()
-            plt.savefig(self.base_dir + f"strategy_episode{strategy[0]}.png")
+            plt.savefig(self.base_dir + f"strategy_episode{strategy[0]}_(actions_counts).png")
             if show:
                 plt.show()
-
-
+        plt.close()
