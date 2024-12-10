@@ -37,7 +37,7 @@ class QLearningAgent(BaseAgent):
         self.save_q_every = save_q_every
 
         date_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.base_dir = f'{system_experience_dir}{date_string}/'
+        self.base_dir = f'{system_experience_dir}{date_string}/{reward_strategy}_{state_space_config}/'
         os.makedirs(self.base_dir, exist_ok=True)
 
         self.model_path = self.base_dir + 'model_QLearningAgent.pkl'
@@ -398,7 +398,7 @@ class QLearningAgent(BaseAgent):
             plt.title(f"Episode={episode} Action Frequency Heatmap")
             plt.xlabel("Action")
             plt.ylabel("State")
-            plt.savefig(self.base_dir + "action_frequency_heatmap.png")
+            plt.savefig(self.base_dir + f"action_frequency_heatmap_episode{episode}.png")
             if show:
                 plt.show()
             plt.close()

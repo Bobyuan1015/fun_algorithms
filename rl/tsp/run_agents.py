@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 from rl.env.tsp_env import TSPEnv
 from rl.tsp.agents.actor_critic_agent import ActorCriticAgent
 from rl.tsp.agents.dqn_agent import DQNAgent
@@ -19,20 +21,29 @@ def evaluate(agent):
 if __name__ == '__main__':
     num_cities = 5
     num_actions = num_cities
-    num_episodes = 100
+    num_episodes = 800
 
     env = TSPEnv(num_cities=num_cities)
-    agent = QLearningAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance", state_space_config='visits')
-    # agent = DQNAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
-    # agent = ActorCriticAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
-    # agent = PPOAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
+    reward_policys = ['negative_distance','negative_distance_with_return_bonus','negative_distance_return_with_best_bonus','zero_step_final_bonus','positive_final_bonus','adaptive_reward','dynamic_penalty_reduction','segment_bonus',
+                      'average_baseline','feedback_adjustment','heuristic_mst',
+                      'curiosity_driven','diversity_driven'
+                      ]
+    state_policies = ['step','visits']
+    with tqdm(total=len(reward_policys)*len(state_policies),desc="exp",unit="comb") as pbar:
+        for r in reward_policys:
+            for state in state_policies:
+                agent = QLearningAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy=r, state_space_config=state)
+                # agent = DQNAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
+                # agent = ActorCriticAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
+                # agent = PPOAgent(num_cities=num_cities, num_actions=num_actions, reward_strategy="negative_distance")
 
-    agent.train(env, num_episodes)
-    # evaluate(agent)
-    agent.plot_strategy()
-    agent.save_results()
-    agent.plot_results()
-    agent.plot_q_value_changes()
-    agent.plot_policy_evolution()
-    agent.plot_action_frequencies()
-    agent.plot_q_value_trends()
+                agent.train(env, num_episodes)
+                # evaluate(agent)
+                agent.plot_strategy()
+                agent.save_results()
+                agent.plot_results()
+                agent.plot_q_value_changes()
+                agent.plot_policy_evolution()
+                agent.plot_action_frequencies()
+                agent.plot_q_value_trends()
+                pbar.update(1)
