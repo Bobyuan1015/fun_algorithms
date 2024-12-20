@@ -64,7 +64,6 @@ class QLearningTSP:
             self.strategy_matrix[key] = {action: 0}
         elif action not in self.strategy_matrix[key]:
             self.strategy_matrix[key][action] = 0
-
         self.strategy_matrix[key][action] += 1
 
     def get_strategy_matrix(self):

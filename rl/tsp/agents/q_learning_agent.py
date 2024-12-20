@@ -271,7 +271,7 @@ class QLearningAgent(BaseAgent):
 
                 state = next_state
                 total_distance = next_state['total_distance']
-                print(f'episode=episode{episode}    total_distance={total_distance}')
+                print(f'episode=episode{episode}  {self.reward_strategy}   {self.state_space_config}  total_distance={total_distance}')
             # Episode ended
             self.episode_rewards.append(episode_reward)
             self.cumulative_rewards.append(sum(self.episode_rewards))
@@ -388,7 +388,7 @@ class QLearningAgent(BaseAgent):
             plt.savefig(self.base_dir + f"q_table_snapshot_{i + 1}.png")
             if show:
                 plt.show()
-        plt.close()
+            plt.close()
 
     def plot_action_frequencies(self,show=False):
         for episode, action_frequency in self.iteration_action_frequencies:
@@ -417,6 +417,7 @@ class QLearningAgent(BaseAgent):
             plt.savefig(self.base_dir + "q_value_trends.png")
             if show:
                 plt.show()
+            plt.close()
 
         elif self.state_space_config == "visits":
             # Ensure there are Q-table snapshots
@@ -495,6 +496,7 @@ class QLearningAgent(BaseAgent):
 
                 # Move to the next color for the next state
                 color_idx += 1
+                plt.close()
 
     def get_policy(self):
         policy = {}
@@ -523,4 +525,4 @@ class QLearningAgent(BaseAgent):
             plt.savefig(self.base_dir + f"strategy_episode{strategy[0]}_(actions_counts).png")
             if show:
                 plt.show()
-        plt.close()
+            plt.close()

@@ -1,3 +1,5 @@
+import time
+
 from tqdm import tqdm
 
 from rl.env.tsp_env import TSPEnv
@@ -21,7 +23,7 @@ def evaluate(agent):
 if __name__ == '__main__':
     num_cities = 5
     num_actions = num_cities
-    num_episodes = 800
+    num_episodes = 2000
 
     env = TSPEnv(num_cities=num_cities)
     reward_policys = ['negative_distance','negative_distance_with_return_bonus','negative_distance_return_with_best_bonus','zero_step_final_bonus','positive_final_bonus','adaptive_reward','dynamic_penalty_reduction','segment_bonus',
@@ -47,3 +49,4 @@ if __name__ == '__main__':
                 agent.plot_action_frequencies()
                 agent.plot_q_value_trends()
                 pbar.update(1)
+                time.sleep(1)
