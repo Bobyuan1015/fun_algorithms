@@ -1,7 +1,10 @@
 import time
-
 from tqdm import tqdm
+import os, sys
 
+project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+print(project_dir)
+sys.path.append(project_dir)
 from rl.env.tsp_env import TSPEnv
 from rl.tsp.agents.actor_critic_agent import ActorCriticAgent
 from rl.tsp.agents.dqn_agent import DQNAgent
@@ -31,6 +34,8 @@ if __name__ == '__main__':
                       'curiosity_driven','diversity_driven'
                       ]
     state_policies = ['step','visits']
+    total_len = len(reward_policys)*len(state_policies)
+    count = 0
     with tqdm(total=len(reward_policys)*len(state_policies),desc="exp",unit="comb") as pbar:
         for r in reward_policys:
             for state in state_policies:
@@ -48,5 +53,8 @@ if __name__ == '__main__':
                 agent.plot_policy_evolution()
                 agent.plot_action_frequencies()
                 agent.plot_q_value_trends()
-                pbar.update(1)
+                pbar.update(0.5)
                 time.sleep(1)
+
+                print(f'{count} in {total_len} ')
+                count += 1
